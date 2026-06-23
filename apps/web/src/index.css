@@ -16,53 +16,77 @@ body,
 body {
   margin: 0;
   color: #edeff3;
-  background-color: #0b0c10;
-  background-image: radial-gradient(1100px 620px at 80% -10%, rgba(216, 182, 124, 0.07), transparent 60%),
-    radial-gradient(900px 520px at 8% -4%, rgba(90, 166, 240, 0.06), transparent 55%);
-  background-attachment: fixed;
+  background-color: #0a0b12;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'cv11', 'ss01';
 }
 
-/* Keyboard focus ring — brass, only for keyboard nav. */
+/* Vivid, slowly-drifting colour mesh behind the frosted glass. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -30%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(34% 40% at 16% 18%, rgba(216, 168, 96, 0.42), transparent 60%),
+    radial-gradient(36% 42% at 84% 12%, rgba(74, 154, 234, 0.40), transparent 60%),
+    radial-gradient(40% 46% at 70% 86%, rgba(154, 124, 240, 0.38), transparent 62%),
+    radial-gradient(34% 40% at 26% 88%, rgba(43, 196, 150, 0.30), transparent 62%),
+    radial-gradient(50% 50% at 50% 50%, rgba(90, 110, 200, 0.16), transparent 70%);
+  filter: blur(26px) saturate(1.15);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+@keyframes drift {
+  from {
+    transform: translate3d(-2.5%, -2%, 0) scale(1) rotate(0deg);
+  }
+  to {
+    transform: translate3d(3.5%, 2.5%, 0) scale(1.1) rotate(2deg);
+  }
+}
+
 :focus-visible {
-  outline: 2px solid rgba(216, 182, 124, 0.7);
+  outline: 2px solid rgba(216, 182, 124, 0.75);
   outline-offset: 2px;
   border-radius: 8px;
 }
 
-/* Thin, calm scrollbars. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 *::-webkit-scrollbar {
   height: 8px;
   width: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* ── Component layer — one cohesive, modern vocabulary ─────────────────────── */
+/* ── Glassmorphism component layer ─────────────────────────────────────────── */
 @layer components {
-  /* Elevated surface: soft ring + gentle shadow + rounded. */
-  .card {
-    @apply rounded-2xl bg-panel ring-1 ring-white/[0.06] shadow-card;
+  /* Frosted DARK glass: dark translucent fill keeps text legible while the blur
+     picks up the colour mesh behind; light edge + top sheen + soft shadow. */
+  .glass {
+    @apply border border-white/[0.12] backdrop-blur-2xl shadow-pop;
+    background-color: rgba(13, 15, 22, 0.55);
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.012));
   }
-  /* Interactive surface: subtle hover lift. */
+  .card {
+    @apply glass rounded-2xl;
+  }
   .card-i {
-    @apply card transition-[transform,background-color,box-shadow] duration-200 ease-smooth
-           hover:-translate-y-[1px] hover:bg-surface/60;
+    @apply card transition-[transform,box-shadow,border-color] duration-200 ease-smooth
+           hover:-translate-y-[1px] hover:border-white/[0.2];
   }
 
-  /* Captions: small, quiet. Use mono only where it's data. */
   .label {
     @apply text-[11px] font-medium text-text3 tracking-tight2;
   }
@@ -70,11 +94,11 @@ body {
     @apply font-mono text-[10px] uppercase tracking-[0.14em] text-text3;
   }
 
-  /* Buttons — tactile, with a press micro-interaction. */
+  /* Buttons — translucent glass, tactile press. */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border font-medium
-           leading-none select-none transition-all duration-150 ease-smooth
-           active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border font-medium leading-none
+           select-none transition-all duration-150 ease-smooth active:scale-[0.96]
+           disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-sm {
     @apply h-8 px-3 text-xs;
@@ -86,45 +110,43 @@ body {
     @apply h-11 px-5 text-sm;
   }
   .btn-ghost {
-    @apply border-white/[0.08] bg-white/[0.02] text-text2 hover:text-text hover:bg-white/[0.05] hover:border-white/[0.14];
+    @apply border-white/[0.12] bg-white/[0.05] text-text2 backdrop-blur-md
+           hover:text-text hover:bg-white/[0.1] hover:border-white/[0.2];
   }
   .btn-quiet {
-    @apply border-transparent text-text3 hover:text-text hover:bg-white/[0.05];
+    @apply border-transparent text-text3 hover:text-text hover:bg-white/[0.06];
   }
   .btn-primary {
-    @apply border-transparent bg-brass text-[#1a140a] font-semibold
-           hover:bg-brass/90 hover:shadow-glow-brass active:bg-brass/80;
+    @apply border-white/20 bg-brass/90 text-[#1a140a] font-semibold backdrop-blur-md
+           hover:bg-brass hover:shadow-glow-brass active:bg-brass/80;
   }
   .btn-danger {
-    @apply border-danger/30 bg-danger/10 text-danger hover:bg-danger/15 hover:border-danger/50;
+    @apply border-danger/30 bg-danger/15 text-danger backdrop-blur-md
+           hover:bg-danger/25 hover:border-danger/50;
   }
 
-  /* Pill chip. */
   .chip {
-    @apply inline-flex items-center justify-center h-8 px-3.5 rounded-full
-           border border-white/[0.08] bg-white/[0.02] text-xs font-medium text-text2
-           transition-all duration-150 ease-smooth active:scale-[0.97]
-           hover:text-text hover:bg-white/[0.06] hover:border-white/[0.14];
+    @apply inline-flex items-center justify-center h-8 px-3.5 rounded-full border border-white/[0.12]
+           bg-white/[0.05] text-xs font-medium text-text2 backdrop-blur-md
+           transition-all duration-150 ease-smooth active:scale-[0.96]
+           hover:text-text hover:bg-white/[0.1] hover:border-white/[0.2];
   }
-  /* Status / meta tag. */
   .tag {
     @apply inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium;
   }
-  /* Inputs / selects. */
   .field {
-    @apply rounded-xl border border-white/[0.08] bg-surface text-text
+    @apply rounded-xl border border-white/[0.12] bg-white/[0.05] text-text backdrop-blur-md
            placeholder:text-text3 transition-colors duration-150
            focus:outline-none focus:border-brass/55 focus:ring-2 focus:ring-brass/15;
   }
 
-  /* Loading shimmer. */
   .shimmer {
-    @apply relative overflow-hidden bg-surface/60;
+    @apply relative overflow-hidden bg-white/[0.04];
   }
   .shimmer::after {
     content: '';
     @apply absolute inset-0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
     transform: translateX(-100%);
     animation: shimmer 1.4s infinite;
   }
@@ -135,7 +157,6 @@ body {
   }
 }
 
-/* Honour reduced-motion. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

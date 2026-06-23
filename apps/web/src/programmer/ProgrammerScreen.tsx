@@ -97,7 +97,7 @@ export default function ProgrammerScreen({
   onToggleStopOnCommit = noop,
 }: ProgrammerScreenProps) {
   return (
-    <div className="min-h-full bg-bg text-text font-sans">
+    <div className="min-h-full text-text font-sans">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">

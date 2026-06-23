@@ -47,7 +47,7 @@ export default function App() {
 
 // ── Chrome ──────────────────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-full bg-bg text-text font-sans">{children}</div>;
+  return <div className="min-h-full text-text font-sans">{children}</div>;
 }
 function Splash({ children }: { children: React.ReactNode }) {
   return (
@@ -392,9 +392,15 @@ function AdminApp({ me }: { me: Me }) {
 
   const onAskQuestion = useCallback(
     (args: { targetUserId: string; taskId: string; sessionId: string; body: string }) => {
-      void api('/questions', { method: 'POST', body: JSON.stringify(args) }).then(() => void loadQuestions());
+      void api('/questions', { method: 'POST', body: JSON.stringify(args) })
+        .then(() => {
+          void loadQuestions();
+          // refresh the open day so the question shows in the session thread + "?" marker
+          if (selectedUser) void loadDay(selectedUser);
+        })
+        .catch(() => {});
     },
-    [loadQuestions],
+    [loadQuestions, loadDay, selectedUser],
   );
 
   const endOpenSessions = useCallback(async () => {
