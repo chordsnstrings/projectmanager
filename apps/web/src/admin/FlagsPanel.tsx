@@ -14,6 +14,7 @@ const TYPE_LABEL: Record<FlagDTO['type'], string> = {
   activity_no_session: 'activity · no session',
   long_open_session: 'long open session',
   overrun: 'overrun',
+  duplicate_session: 'duplicate timers',
 };
 
 /** Tasteful tints per §9. danger for the hard problems, brass for time, muted for the soft one. */
@@ -22,6 +23,7 @@ const TYPE_CLASS: Record<FlagDTO['type'], string> = {
   activity_no_session: 'text-text2 border-hair2 bg-surface2',
   long_open_session: 'text-brass border-brass/40 bg-brass/10',
   overrun: 'text-brass border-brass/40 bg-brass/10',
+  duplicate_session: 'text-brass border-brass/40 bg-brass/10',
 };
 
 function TypeBadge({ type }: { type: FlagDTO['type'] }) {

@@ -2,8 +2,8 @@
 // reconcile job (§6/§10) and reusable from the webhook path.
 import type { Db } from '../sync/upsert';
 import { env } from '../env';
-import { longOpenSession, openNoActivity, overrun, type FlagCandidate } from './flags';
-import { sumMinutes } from './sessionMath';
+import { duplicateSessions, longOpenSession, openNoActivity, overrun, type FlagCandidate } from './flags';
+import { hasConcurrency, unionMinutes } from './sessionMath';
 import { dominantActivity } from './activity';
 import { localToday, resolveTz, startOfLocalDay } from '../lib/tz';
 
@@ -157,7 +157,8 @@ export async function reconcileFlags(db: Db, now = Date.now()): Promise<Reconcil
     include: { sessions: { where: { deletedAt: null } } },
   });
   for (const t of tasks) {
-    const actualMinutes = sumMinutes(
+    // one task → union (duplicate timers on the same task must not trigger overrun)
+    const actualMinutes = unionMinutes(
       t.sessions.map((s) => ({
         start: s.startedAt.getTime(),
         end: (s.endedAt ?? new Date(now)).getTime(),
@@ -172,6 +173,48 @@ export async function reconcileFlags(db: Db, now = Date.now()): Promise<Reconcil
       },
       env.OVERRUN_FACTOR,
     );
+    if (cand && (await persistFlagCandidate(db, cand))) flagsCreated++;
+  }
+
+  // ── Duplicate concurrent timers on the same task/off-task → duplicate_session ─
+  const since = new Date(now - 3 * 86_400_000);
+  const recent = await db.session.findMany({
+    where: { deletedAt: null, startedAt: { gte: since } },
+    orderBy: { startedAt: 'asc' },
+  });
+  type Grp = { userId: string; taskId: string | null; label: string; ivs: { start: number; end: number }[]; latestId: string; latestStart: number };
+  const groups = new Map<string, Grp>();
+  for (const s of recent) {
+    const key = `${s.userId}:${s.taskId ?? `offtask:${s.offTaskLabel ?? 'off-task'}`}`;
+    const start = s.startedAt.getTime();
+    const end = (s.endedAt ?? new Date(now)).getTime();
+    const g = groups.get(key);
+    if (!g) {
+      groups.set(key, {
+        userId: s.userId,
+        taskId: s.taskId,
+        label: s.offTaskLabel ?? 'this task',
+        ivs: [{ start, end }],
+        latestId: s.id,
+        latestStart: start,
+      });
+    } else {
+      g.ivs.push({ start, end });
+      if (start >= g.latestStart) {
+        g.latestStart = start;
+        g.latestId = s.id;
+      }
+    }
+  }
+  for (const g of groups.values()) {
+    if (g.ivs.length < 2 || !hasConcurrency(g.ivs)) continue;
+    const cand = duplicateSessions({
+      userId: g.userId,
+      taskId: g.taskId,
+      latestSessionId: g.latestId,
+      overlappingCount: g.ivs.length,
+      label: g.label,
+    });
     if (cand && (await persistFlagCandidate(db, cand))) flagsCreated++;
   }
 

@@ -40,6 +40,17 @@ export function sumMinutes(intervals: Interval[]): number {
   return Math.round(total / 60000);
 }
 
+/**
+ * Task-hours done right: union WITHIN each task (same-task overlap is duplication,
+ * e.g. accidental duplicate timers) summed ACROSS tasks (cross-task overlap is
+ * genuine concurrency, so it adds). Pass one interval array per task/off-task group.
+ */
+export function groupedTaskMinutes(groups: Interval[][]): number {
+  let total = 0;
+  for (const g of groups) total += unionMinutes(g);
+  return total;
+}
+
 /** Do any two intervals overlap (i.e. was there concurrency)? */
 export function hasConcurrency(intervals: Interval[]): boolean {
   const sorted = [...intervals]

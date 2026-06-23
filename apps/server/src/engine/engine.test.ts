@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { hasConcurrency, sumMinutes, unionMinutes } from './sessionMath';
+import { groupedTaskMinutes, hasConcurrency, sumMinutes, unionMinutes } from './sessionMath';
 import { dominantActivity, inferActivityFromMessage } from './activity';
 import { extractIssueRefs } from './attribution';
-import { activityNoSession, longOpenSession, openNoActivity, overrun } from './flags';
+import { activityNoSession, duplicateSessions, longOpenSession, openNoActivity, overrun } from './flags';
 
 const T = (h: number, m = 0) => new Date(2026, 5, 23, h, m).getTime();
 
@@ -24,6 +24,29 @@ describe('sessionMath', () => {
     expect(unionMinutes(ivs)).toBe(120);
     expect(sumMinutes(ivs)).toBe(120);
     expect(hasConcurrency(ivs)).toBe(false);
+  });
+
+  it('groupedTaskMinutes collapses same-task overlap but adds across tasks', () => {
+    // task A: 11 duplicate timers all 9:11–10:38 (~87m) → union ~87m, not ~16h
+    const dupA = Array.from({ length: 11 }, () => ({ start: T(9, 11), end: T(10, 38) }));
+    // task B: a genuinely concurrent 9:30–10:30 (60m) on a different task
+    const b = [{ start: T(9, 30), end: T(10, 30) }];
+    expect(groupedTaskMinutes([dupA])).toBe(87); // collapsed
+    expect(sumMinutes(dupA)).toBe(87 * 11); // the old (wrong) inflation
+    // cross-task concurrency still adds: 87 + 60
+    expect(groupedTaskMinutes([dupA, b])).toBe(147);
+  });
+});
+
+describe('duplicateSessions flag', () => {
+  it('flags 2+ overlapping sessions on the same group', () => {
+    const f = duplicateSessions({ userId: 'u', taskId: 't', latestSessionId: 's2', overlappingCount: 11, label: 'off-task' });
+    expect(f?.type).toBe('duplicate_session');
+    expect(f?.sessionId).toBe('s2');
+    expect(f?.detail).toContain('11');
+  });
+  it('does not flag a single session', () => {
+    expect(duplicateSessions({ userId: 'u', taskId: 't', latestSessionId: 's1', overlappingCount: 1, label: 'x' })).toBeNull();
   });
 });
 

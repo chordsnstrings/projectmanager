@@ -53,6 +53,7 @@ enum FlagType {
   activity_no_session
   long_open_session
   overrun
+  duplicate_session
 }
 
 enum FlagStatus {

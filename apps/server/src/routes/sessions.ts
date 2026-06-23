@@ -51,6 +51,23 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       isOpen = false;
     }
 
+    // Dedupe: a live start for a task/off-task that already has an OPEN session
+    // for this user returns the existing one instead of stacking a duplicate
+    // timer (which would inflate task-hours). Backfills are exempt.
+    if (isOpen) {
+      const existing = await prisma.session.findFirst({
+        where: {
+          userId: user.id,
+          isOpen: true,
+          deletedAt: null,
+          ...(taskId ? { taskId } : { taskId: null, offTaskLabel: offTaskLabel ?? null }),
+        },
+        include: { segments: true },
+        orderBy: { startedAt: 'asc' },
+      });
+      if (existing) return reply.code(200).send(sessionToDTO(existing));
+    }
+
     const session = await prisma.session.create({
       data: {
         userId: user.id,

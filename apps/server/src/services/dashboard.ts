@@ -13,7 +13,7 @@ import type {
   Trends,
   TrendPoint,
 } from '@cadence/shared';
-import { sumMinutes, unionMinutes, type Interval } from '../engine/sessionMath';
+import { groupedTaskMinutes, sumMinutes, unionMinutes, type Interval } from '../engine/sessionMath';
 import { taskOrigin } from './map';
 import { localDayRange, localToday, resolveTz } from '../lib/tz';
 
@@ -51,6 +51,14 @@ export async function buildTeamDashboard(
     const intervals: Interval[] = sessions.map((s) =>
       clip({ start: s.startedAt.getTime(), end: (s.endedAt ?? new Date(now)).getTime() }, startMs, endMs),
     );
+    // Group intervals per task/off-task so same-task overlap (duplicate timers)
+    // collapses, while different tasks still add toward task-hours.
+    const byTask = new Map<string, Interval[]>();
+    for (const s of sessions) {
+      const key = s.taskId ?? `offtask:${s.offTaskLabel ?? 'off-task'}`;
+      const iv = clip({ start: s.startedAt.getTime(), end: (s.endedAt ?? new Date(now)).getTime() }, startMs, endMs);
+      byTask.set(key, [...(byTask.get(key) ?? []), iv]);
+    }
     const openFlagCount = await prisma.flag.count({ where: { userId: u.id, status: 'open' } });
     const closedTasks = await prisma.task.findMany({
       where: {
@@ -63,7 +71,8 @@ export async function buildTeamDashboard(
     const accuracies = closedTasks
       .filter((t) => t.estimateMinutes && t.estimateMinutes > 0)
       .map((t) => {
-        const actual = sumMinutes(
+        // one task → union (duplicate timers on the same task shouldn't inflate)
+        const actual = unionMinutes(
           t.sessions.map((s) => ({
             start: s.startedAt.getTime(),
             end: (s.endedAt ?? new Date(now)).getTime(),
@@ -83,7 +92,7 @@ export async function buildTeamDashboard(
       name: u.name,
       avatarUrl: u.avatarUrl,
       activeElapsedMinutes: unionMinutes(intervals),
-      taskHoursMinutes: sumMinutes(intervals),
+      taskHoursMinutes: groupedTaskMinutes([...byTask.values()]),
       sessionCount: sessions.length,
       openFlagCount,
       runningTaskTitles: sessions
@@ -269,7 +278,9 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
       questionIds: questionsBySession.get(s.id) ?? [],
     }));
 
-    const actual = sumMinutes(
+    // One lane = one task → union (overlapping/duplicate timers on the same task
+    // are the same work and must not double-count).
+    const actual = unionMinutes(
       laneSessions.map((s) => ({
         start: s.startedAt.getTime(),
         end: (s.endedAt ?? new Date(now)).getTime(),
@@ -305,7 +316,9 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
     dayStart: dayStart.toISOString(),
     dayEnd: dayEnd.toISOString(),
     activeElapsedMinutes: unionMinutes(allIntervals),
-    taskHoursMinutes: sumMinutes(allIntervals),
+    // sum of per-lane (per-task) unions — cross-task concurrency adds, same-task
+    // overlap does not.
+    taskHoursMinutes: lanes.reduce((acc, l) => acc + l.actualMinutes, 0),
     sessionCount: sessions.length,
     flags: dayFlags.map(
       (f): FlagDTO => ({

@@ -82,6 +82,28 @@ export function overrun(
 }
 
 /**
+ * duplicate_session: two or more sessions on the SAME task/off-task overlap in
+ * time for one user — i.e. duplicate timers were left running concurrently,
+ * which inflates task-hours. Flags the group (pinned to its latest session).
+ */
+export function duplicateSessions(group: {
+  userId: string;
+  taskId: string | null;
+  latestSessionId: string;
+  overlappingCount: number;
+  label: string;
+}): FlagCandidate | null {
+  if (group.overlappingCount < 2) return null;
+  return {
+    type: 'duplicate_session',
+    userId: group.userId,
+    sessionId: group.latestSessionId,
+    taskId: group.taskId,
+    detail: `${group.overlappingCount} overlapping sessions on "${group.label}" — likely duplicate timers. Counted once toward task-hours.`,
+  };
+}
+
+/**
  * activity_no_session: a git-event with no session covering its time on that
  * task/repo for its author.
  */

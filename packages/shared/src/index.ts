@@ -18,7 +18,8 @@ export type FlagType =
   | 'open_no_activity'
   | 'activity_no_session'
   | 'long_open_session'
-  | 'overrun';
+  | 'overrun'
+  | 'duplicate_session';
 export type FlagStatus = 'open' | 'resolved' | 'dismissed';
 export type QuestionStatus = 'open' | 'answered';
 
