@@ -20,6 +20,7 @@ export default function SessionDetail({
   onClose,
   onAsk,
   canAsk = false,
+  autoAsk = false,
   questions = [],
 }: {
   session: TimelineSession;
@@ -28,11 +29,13 @@ export default function SessionDetail({
   /** raise a question pinned to this session/task (gates the dev's next completion) */
   onAsk?: (body: string) => void;
   canAsk?: boolean;
+  /** open the question input immediately (used when entering via "ask…" on a lane) */
+  autoAsk?: boolean;
   /** questions already raised on this session (thread) */
   questions?: QuestionDTO[];
 }) {
   const breakdown = activityBreakdown(session);
-  const [asking, setAsking] = useState(false);
+  const [asking, setAsking] = useState(autoAsk && canAsk);
   const [body, setBody] = useState('');
   return (
     <div className="border-t border-hair2 bg-surface/50 px-4 sm:px-5 py-4 animate-fade-in">

@@ -71,10 +71,24 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
   const ticks = hourTicks(w);
   const bands = concurrentBands(data, w);
   const [selected, setSelected] = useState<TimelineSession | null>(null);
+  const [autoAsk, setAutoAsk] = useState(false);
   const selectedLane =
     selected != null ? data.lanes.find((l) => l.sessions.some((s) => s.id === selected.id)) : undefined;
   const selectedLaneTitle = selectedLane?.title ?? '';
   const selectedTaskId = selectedLane?.taskId ?? null;
+
+  // Clicking a task label/row (not a single bar) selects its latest session so
+  // the detail + ask works for the whole task — including closed/past ones.
+  const selectLane = (lane: (typeof data.lanes)[number], ask: boolean) => {
+    const latest = lane.sessions.reduce<TimelineSession | null>(
+      (acc, s) => (acc && new Date(acc.startedAt) >= new Date(s.startedAt) ? acc : s),
+      null,
+    );
+    if (latest) {
+      setSelected(latest);
+      setAutoAsk(ask);
+    }
+  };
   // Unresolved flags drive the danger markers on bars.
   const flaggedIds = new Set(
     data.flags.filter((f) => f.status === 'open' && f.sessionId).map((f) => f.sessionId as string),
@@ -148,7 +162,12 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
                   window={w}
                   flaggedIds={flaggedIds}
                   selectedId={selected?.id ?? null}
-                  onSelect={setSelected}
+                  onSelect={(s) => {
+                    setSelected(s);
+                    setAutoAsk(false);
+                  }}
+                  onSelectLane={(l) => selectLane(l, false)}
+                  onAskLane={(l) => selectLane(l, true)}
                 />
               ))
             )}
@@ -159,9 +178,14 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
       {/* Selected-session detail — rendered in normal flow (no clipping). */}
       {selected && (
         <SessionDetail
+          key={`${selected.id}${autoAsk ? '-ask' : ''}`}
           session={selected}
           laneTitle={selectedLaneTitle}
-          onClose={() => setSelected(null)}
+          autoAsk={autoAsk && Boolean(selectedTaskId)}
+          onClose={() => {
+            setSelected(null);
+            setAutoAsk(false);
+          }}
           questions={data.questions.filter((q) => q.sessionId === selected.id)}
           canAsk={Boolean(selectedTaskId)}
           onAsk={
