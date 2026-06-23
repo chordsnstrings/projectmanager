@@ -180,6 +180,24 @@ function DevApp({ me }: { me: Me }) {
     return () => clearInterval(id);
   }, [doSync, refresh]);
 
+  // Live "stop on commit": while a task session is running, poll just that repo
+  // for new commits (no webhooks needed) and auto-stop within ~30s.
+  const watchCommits = stopOnCommit && active.some((s) => s.taskId && s.isOpen);
+  useEffect(() => {
+    if (!watchCommits) return;
+    let cancelled = false;
+    const run = async () => {
+      await api('/sessions/sync-commits', { method: 'POST' }).catch(() => {});
+      if (!cancelled) await refresh();
+    };
+    void run();
+    const id = setInterval(run, 25000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [watchCommits, refresh]);
+
   const onStart = useCallback(
     async (taskId: string) => {
       await api<SessionDTO>('/sessions', { method: 'POST', body: JSON.stringify({ taskId }) });

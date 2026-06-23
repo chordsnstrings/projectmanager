@@ -186,3 +186,55 @@ export async function syncUserProjects(
 
   return { tasks, repos: repoIds.size };
 }
+
+/**
+ * Lightweight live check: for each of the user's OPEN task-sessions, pull just
+ * that repo's recent commits by the user since the session started and ingest
+ * them (attributed to the session's task). Cheap (one repo per running session)
+ * so it can be polled — pairs with autoStopOnCommit to stop the timer on commit
+ * without webhooks. Returns the number of commits ingested.
+ */
+export async function syncRunningSessionCommits(
+  db: Db,
+  token: string,
+  userId: string,
+  login: string,
+): Promise<number> {
+  const open = await db.session.findMany({
+    where: { isOpen: true, deletedAt: null, taskId: { not: null }, userId },
+    include: { task: { include: { repo: true } } },
+  });
+  let ingested = 0;
+  const seenRepo = new Set<string>();
+  for (const s of open) {
+    const repo = s.task?.repo;
+    if (!repo || !s.taskId) continue;
+    const cacheKey = `${repo.id}:${s.startedAt.getTime()}`;
+    if (seenRepo.has(cacheKey)) continue;
+    seenRepo.add(cacheKey);
+    try {
+      const since = s.startedAt.toISOString();
+      const commits: any[] = await ghGet(
+        token,
+        `/repos/${repo.fullName}/commits?author=${encodeURIComponent(login)}&since=${since}&per_page=10`,
+      );
+      for (const c of commits) {
+        const created = await appendGitEvent(db, {
+          repoId: repo.id,
+          taskId: s.taskId,
+          authorUserId: userId,
+          type: 'commit',
+          sha: c.sha,
+          branch: repo.defaultBranch,
+          message: c.commit?.message ?? null,
+          occurredAt: new Date(c.commit?.author?.date ?? Date.now()),
+          deliveryId: `live:${repo.id}:${c.sha}`,
+        });
+        if (created) ingested++;
+      }
+    } catch {
+      /* best-effort */
+    }
+  }
+  return ingested;
+}

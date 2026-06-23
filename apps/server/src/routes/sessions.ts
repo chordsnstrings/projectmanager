@@ -10,6 +10,9 @@ import type {
 } from '@cadence/shared';
 import { requireUser } from '../auth/require';
 import { sessionToDTO } from '../services/map';
+import { decryptToken } from '../auth/tokenCrypto';
+import { syncRunningSessionCommits } from '../github/userSync';
+import { autoStopOnCommit } from '../engine/reconcileFlags';
 import { extractIssueRefs } from '../engine/attribution';
 import { dominantActivity, inferActivityFromMessage } from '../engine/activity';
 import { hasOpenBlockingQuestion } from '../services/questionGate';
@@ -137,6 +140,31 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       return sessionToDTO(updated);
     },
   );
+
+  // ── Live commit check: ingest commits for running task-sessions + auto-stop ─
+  // Cheap (only running-session repos); the client polls this so "stop on commit"
+  // works within ~30s without the GitHub App webhooks.
+  app.post('/sessions/sync-commits', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { githubAccessToken: true, githubLogin: true, stopOnCommit: true },
+    });
+    const token = decryptToken(row?.githubAccessToken);
+    let ingested = 0;
+    let stopped = 0;
+    if (token) {
+      ingested = await syncRunningSessionCommits(prisma, token, user.id, row!.githubLogin).catch(() => 0);
+      if (row?.stopOnCommit) stopped = await autoStopOnCommit(prisma).catch(() => 0);
+    }
+    const sessions = await prisma.session.findMany({
+      where: { userId: user.id, isOpen: true, deletedAt: null },
+      include: { segments: true },
+      orderBy: { startedAt: 'desc' },
+    });
+    return { ingested, stopped, active: sessions.map(sessionToDTO) };
+  });
 
   // ── Active sessions (poll for live UI) ──────────────────────────────────────
   app.get('/sessions/active', async (req, reply) => {

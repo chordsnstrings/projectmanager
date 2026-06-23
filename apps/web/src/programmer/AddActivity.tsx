@@ -42,7 +42,10 @@ export default function AddActivity({
           <button
             key={l}
             type="button"
-            onClick={() => onStartLabeled(l)}
+            onClick={() => {
+              onStartLabeled(l);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             className="chip"
             title={`start a ${l} session now`}
           >
