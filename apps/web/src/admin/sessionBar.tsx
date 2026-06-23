@@ -71,6 +71,16 @@ export default function SessionBar({ session, window: w, flaggedIds, selected, o
           aria-hidden
         />
       )}
+
+      {/* question marker (admin asked about this session) */}
+      {session.questionIds.length > 0 && (
+        <span
+          className="pointer-events-none absolute -top-2 right-0 text-brass text-[10px] leading-none"
+          aria-hidden
+        >
+          ?
+        </span>
+      )}
     </div>
   );
 }

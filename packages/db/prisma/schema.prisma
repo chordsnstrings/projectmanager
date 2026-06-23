@@ -74,6 +74,7 @@ model User {
   email       String?
   avatarUrl   String?
   role        Role        @default(dev)
+  stopOnCommit Boolean    @default(false) // auto-close a task's open session when a commit lands
   githubAccessToken String? // OAuth token, AES-256-GCM encrypted at rest (per-user sync)
   emails      UserEmail[]
   sessions    Session[]

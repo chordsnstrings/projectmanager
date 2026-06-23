@@ -119,8 +119,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       email: user.email,
       avatarUrl: user.avatarUrl,
       role: user.role,
+      stopOnCommit: user.stopOnCommit,
     };
     return me;
+  });
+
+  // Per-user settings (e.g. auto-stop a task's session when a commit lands).
+  app.patch<{ Body: { stopOnCommit?: boolean } }>('/me/settings', async (req, reply) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
+    const data: { stopOnCommit?: boolean } = {};
+    if (typeof req.body?.stopOnCommit === 'boolean') data.stopOnCommit = req.body.stopOnCommit;
+    const user = await prisma.user.update({ where: { id: userId }, data });
+    return { stopOnCommit: user.stopOnCommit };
   });
 
   // ── Email aliases (confirm screen, §4) ────────────────────────────────────

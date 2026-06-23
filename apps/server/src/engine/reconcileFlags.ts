@@ -64,6 +64,31 @@ export async function persistFlagCandidate(db: Db, c: FlagCandidate): Promise<bo
   return true;
 }
 
+/**
+ * For users who opted into "stop on commit", close a task's open session at the
+ * time of the first commit that lands after the session started.
+ */
+export async function autoStopOnCommit(db: Db, _now = Date.now()): Promise<number> {
+  let closed = 0;
+  const open = await db.session.findMany({
+    where: { isOpen: true, deletedAt: null, taskId: { not: null }, user: { stopOnCommit: true } },
+  });
+  for (const s of open) {
+    if (!s.taskId) continue;
+    const commit = await db.gitEvent.findFirst({
+      where: { type: 'commit', taskId: s.taskId, occurredAt: { gt: s.startedAt } },
+      orderBy: { occurredAt: 'asc' },
+    });
+    if (!commit) continue;
+    await db.session.update({
+      where: { id: s.id },
+      data: { isOpen: false, endedAt: commit.occurredAt },
+    });
+    closed++;
+  }
+  return closed;
+}
+
 export interface ReconcileResult {
   openSessions: number;
   flagsCreated: number;

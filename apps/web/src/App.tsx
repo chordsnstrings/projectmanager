@@ -92,9 +92,9 @@ function DevApp({ me }: { me: Me }) {
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [active, setActive] = useState<SessionDTO[]>([]);
   const [nudges, setNudges] = useState<NudgeDTO[]>([]);
-  const [wrapping, setWrapping] = useState<Record<string, { session: SessionDTO; draft: DraftSummary }>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
+  const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -136,7 +136,7 @@ function DevApp({ me }: { me: Me }) {
 
   useEffect(() => {
     void doSync();
-    const id = setInterval(refresh, 30000);
+    const id = setInterval(refresh, 15000); // near-live for questions
     return () => clearInterval(id);
   }, [doSync, refresh]);
 
@@ -148,31 +148,28 @@ function DevApp({ me }: { me: Me }) {
     [refresh],
   );
 
+  // One click to end: auto-saves the drafted one-line summary; editable later.
   const onStop = useCallback(
     async (sessionId: string) => {
-      const session = active.find((s) => s.id === sessionId);
+      let summary: string | undefined;
       try {
         const draft = await api<DraftSummary>(`/sessions/${sessionId}/draft-summary`);
-        if (session) setWrapping((w) => ({ ...w, [session.taskId ?? sessionId]: { session, draft } }));
+        summary = draft.summary;
       } catch {
-        await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' });
-        await refresh();
+        /* no draft (e.g. off-task) */
       }
-    },
-    [active, refresh],
-  );
-
-  const onSaveSummary = useCallback(
-    async (sessionId: string, payload: { summary: string; blocked: boolean; closesIssues: number[] }) => {
       await api<SessionDTO>(`/sessions/${sessionId}/stop`, {
         method: 'POST',
-        body: JSON.stringify({ summary: payload.summary, blocked: payload.blocked }),
-      });
-      setWrapping((w) => {
-        const next = { ...w };
-        for (const k of Object.keys(next)) if (next[k]!.session.id === sessionId) delete next[k];
-        return next;
-      });
+        body: JSON.stringify(summary ? { summary } : {}),
+      }).catch(() => {});
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const onEditSummary = useCallback(
+    async (sessionId: string, summary: string) => {
+      await api(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ summary }) }).catch(() => {});
       await refresh();
     },
     [refresh],
@@ -204,6 +201,33 @@ function DevApp({ me }: { me: Me }) {
     await refresh();
   }, [refresh]);
 
+  // Start a labelled non-git activity now (meeting/research/…).
+  const onStartLabeled = useCallback(
+    async (label: string) => {
+      await api<SessionDTO>('/sessions', { method: 'POST', body: JSON.stringify({ offTaskLabel: label }) });
+      await refresh();
+    },
+    [refresh],
+  );
+
+  // Backfill a completed non-git block for TODAY (e.g. a meeting 10:00–11:00).
+  const onBackfill = useCallback(
+    async (label: string, startedAt: string, endedAt: string) => {
+      await api<SessionDTO>('/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ offTaskLabel: label, startedAt, endedAt }),
+      }).catch(() => {});
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const onToggleStopOnCommit = useCallback(async () => {
+    const next = !stopOnCommit;
+    setStopOnCommit(next);
+    await api('/me/settings', { method: 'PATCH', body: JSON.stringify({ stopOnCommit: next }) }).catch(() => {});
+  }, [stopOnCommit]);
+
   const onStartNudge = useCallback(
     async (n: NudgeDTO) => {
       if (n.suggestedTaskId) await onStart(n.suggestedTaskId);
@@ -224,9 +248,6 @@ function DevApp({ me }: { me: Me }) {
 
   const sessionsByTask: Record<string, TaskSessionState> = {};
   for (const s of active) if (s.taskId) sessionsByTask[s.taskId] = { state: 'running', session: s };
-  for (const [taskId, w] of Object.entries(wrapping)) {
-    sessionsByTask[taskId] = { state: 'wrapping', session: w.session, draft: w.draft };
-  }
 
   const nudge = nudges.find((n) => !dismissed.has(n.id)) ?? null;
   const syncedAgo = lastSync ? relativeTime(new Date(lastSync).toISOString()) : 'never';
@@ -243,9 +264,11 @@ function DevApp({ me }: { me: Me }) {
         sessionsByTask={sessionsByTask}
         onStart={onStart}
         onStop={onStop}
-        onSaveSummary={onSaveSummary}
+        onEditSummary={onEditSummary}
         onOverrideActivity={onOverrideActivity}
         onStartOffTask={onStartOffTask}
+        onStartLabeled={onStartLabeled}
+        onBackfill={onBackfill}
         onStartNudge={onStartNudge}
         onDismissNudge={(n) => setDismissed((d) => new Set(d).add(n.id))}
         onRefresh={doSync}
@@ -255,6 +278,8 @@ function DevApp({ me }: { me: Me }) {
         onStopOffTask={onStopOffTask}
         questions={questions}
         onAnswerQuestion={onAnswerQuestion}
+        stopOnCommit={stopOnCommit}
+        onToggleStopOnCommit={onToggleStopOnCommit}
       />
     </Shell>
   );

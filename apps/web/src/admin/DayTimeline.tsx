@@ -162,6 +162,7 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
           session={selected}
           laneTitle={selectedLaneTitle}
           onClose={() => setSelected(null)}
+          questions={data.questions.filter((q) => q.sessionId === selected.id)}
           canAsk={Boolean(selectedTaskId)}
           onAsk={
             onAskQuestion

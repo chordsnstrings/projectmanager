@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { TimelineSession } from '@cadence/shared';
+import type { QuestionDTO, TimelineSession } from '@cadence/shared';
 import { ACTIVITY_COLORS } from '../lib/activity';
-import { fmtClock, fmtDuration } from '../lib/format';
+import { fmtClock, fmtDuration, relativeTime } from '../lib/format';
 
 function activityBreakdown(session: TimelineSession): { type: string; minutes: number }[] {
   const totals = new Map<string, number>();
@@ -20,6 +20,7 @@ export default function SessionDetail({
   onClose,
   onAsk,
   canAsk = false,
+  questions = [],
 }: {
   session: TimelineSession;
   laneTitle: string;
@@ -27,6 +28,8 @@ export default function SessionDetail({
   /** raise a question pinned to this session/task (gates the dev's next completion) */
   onAsk?: (body: string) => void;
   canAsk?: boolean;
+  /** questions already raised on this session (thread) */
+  questions?: QuestionDTO[];
 }) {
   const breakdown = activityBreakdown(session);
   const [asking, setAsking] = useState(false);
@@ -135,6 +138,26 @@ export default function SessionDetail({
       </div>
       {breakdown.length === 0 && session.commits.length === 0 && (
         <div className="font-mono text-[11px] text-text3">no segments or commits recorded</div>
+      )}
+
+      {questions.length > 0 && (
+        <div className="mt-3 border-t border-hair pt-2 space-y-2">
+          {questions.map((q) => (
+            <div key={q.id} className="rounded border border-brass/30 bg-brass/5 p-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[10px] text-brass uppercase tracking-wide">question</span>
+                <span className={`font-mono text-[10px] ${q.status === 'answered' ? 'text-success' : 'text-text3'}`}>
+                  {q.status}
+                </span>
+                <span className="font-mono text-[10px] text-text3 ml-auto">{relativeTime(q.createdAt)}</span>
+              </div>
+              <div className="text-xs text-text mt-1">{q.body}</div>
+              {q.answer && (
+                <div className="text-xs text-text2 mt-1 pl-2 border-l border-hair2">↳ {q.answer}</div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

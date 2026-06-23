@@ -126,6 +126,24 @@ export async function buildDayTimeline(userId: string, date: string): Promise<Da
     }
   }
 
+  const sessionIds = sessions.map((s) => s.id);
+  const dayQuestions = await prisma.question.findMany({
+    where: {
+      targetUserId: userId,
+      OR: [
+        { sessionId: { in: sessionIds } },
+        { createdAt: { gte: dayStart, lte: dayEnd } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  const questionsBySession = new Map<string, string[]>();
+  for (const q of dayQuestions) {
+    if (q.sessionId) {
+      questionsBySession.set(q.sessionId, [...(questionsBySession.get(q.sessionId) ?? []), q.id]);
+    }
+  }
+
   // group sessions into lanes by taskId (off-task → its own lane keyed by label)
   const laneMap = new Map<string, typeof sessions>();
   for (const s of sessions) {
@@ -168,6 +186,7 @@ export async function buildDayTimeline(userId: string, date: string): Promise<Da
       isOpen: s.isOpen,
       intent: s.intent,
       summary: s.summary,
+      offTaskLabel: s.offTaskLabel,
       segments: s.segments.map((seg) => ({
         type: seg.type,
         source: seg.source,
@@ -176,6 +195,7 @@ export async function buildDayTimeline(userId: string, date: string): Promise<Da
       })),
       commits: commitsBySession.get(s.id) ?? [],
       flagIds: flagsBySession.get(s.id) ?? [],
+      questionIds: questionsBySession.get(s.id) ?? [],
     }));
 
     const actual = sumMinutes(
@@ -227,6 +247,19 @@ export async function buildDayTimeline(userId: string, date: string): Promise<Da
         createdAt: f.createdAt.toISOString(),
       }),
     ),
+    questions: dayQuestions.map((q) => ({
+      id: q.id,
+      adminUserId: q.adminUserId,
+      targetUserId: q.targetUserId,
+      taskId: q.taskId,
+      sessionId: q.sessionId,
+      body: q.body,
+      blocksNext: q.blocksNext,
+      status: q.status,
+      answer: q.answer,
+      createdAt: q.createdAt.toISOString(),
+      answeredAt: q.answeredAt ? q.answeredAt.toISOString() : null,
+    })),
     lanes,
   };
 }

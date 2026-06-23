@@ -44,6 +44,7 @@ export interface Me {
   email: string | null;
   avatarUrl: string | null;
   role: Role;
+  stopOnCommit: boolean;
 }
 
 /** Generic paginated envelope — every list endpoint uses this (§2). */
@@ -106,7 +107,13 @@ export interface StartSessionBody {
   taskId?: string;
   offTaskLabel?: string;
   intent?: string;
+  /** backfill a completed session for TODAY (e.g. a meeting): both required together */
+  startedAt?: string;
+  endedAt?: string;
 }
+
+/** Common non-git activities a dev can log off-task. */
+export const OFF_TASK_LABELS = ['meeting', 'research', 'study', 'review', 'pairing', 'planning'] as const;
 
 export interface StopSessionBody {
   summary?: string;
@@ -230,9 +237,11 @@ export interface TimelineSession {
   isOpen: boolean;
   intent: string | null;
   summary: string | null;
+  offTaskLabel: string | null;
   segments: ActivitySegmentDTO[];
   commits: CommitDTO[];
   flagIds: string[];
+  questionIds: string[];
 }
 
 export interface DayTimeline {
@@ -245,6 +254,7 @@ export interface DayTimeline {
   taskHoursMinutes: number;
   sessionCount: number;
   flags: FlagDTO[];
+  questions: QuestionDTO[];
   lanes: TimelineLane[];
 }
 

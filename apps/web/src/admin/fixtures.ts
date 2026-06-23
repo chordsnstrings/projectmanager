@@ -68,6 +68,8 @@ const laneRateLimit: TimelineLane = {
         commit('b2c3d4e', 'feat: per-tenant config wiring', 1 * H + 10 * M),
       ],
       flagIds: [],
+      offTaskLabel: null,
+      questionIds: [],
     },
     {
       id: 's-rl-2',
@@ -79,6 +81,8 @@ const laneRateLimit: TimelineLane = {
       segments: [seg('coding', 3 * H, 3 * H + 30 * M), seg('debugging', 3 * H + 30 * M, 3 * H + 50 * M)],
       commits: [commit('c3d4e5f', 'test: burst traffic integration', 3 * H + 45 * M)],
       flagIds: ['f-1'],
+      offTaskLabel: null,
+      questionIds: [],
     },
   ],
 };
@@ -112,6 +116,8 @@ const laneOauth: TimelineLane = {
         commit('e5f6071', 'test: slow oauth path', 1 * H + 55 * M),
       ],
       flagIds: [],
+      offTaskLabel: null,
+      questionIds: [],
     },
   ],
 };
@@ -138,6 +144,8 @@ const laneSpike: TimelineLane = {
       segments: [seg('research', 4 * H + 10 * M, 4 * H + 45 * M)],
       commits: [],
       flagIds: [],
+      offTaskLabel: null,
+      questionIds: [],
     },
   ],
 };
@@ -165,6 +173,7 @@ export const dayTimelineFixture: DayTimeline = {
   taskHoursMinutes: 280,
   sessionCount: 4,
   flags: dayFlags,
+  questions: [],
   lanes: [laneRateLimit, laneOauth, laneSpike],
 };
 

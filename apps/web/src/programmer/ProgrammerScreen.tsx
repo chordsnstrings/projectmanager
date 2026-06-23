@@ -12,6 +12,7 @@ import TaskRow, { type TaskRowState } from './TaskRow';
 import { Logo } from '../components/Logo';
 import { liveElapsed } from '../lib/format';
 import QuestionsForDev from './QuestionsForDev';
+import AddActivity from './AddActivity';
 
 /** Per-task UI state bundle resolved by the parent (no fetching here). */
 export interface TaskSessionState {
@@ -50,6 +51,11 @@ export interface ProgrammerScreenProps {
   /** open questions the dev must answer (gates next completion) */
   questions?: QuestionDTO[];
   onAnswerQuestion?: (id: string, answer: string) => void;
+  onEditSummary?: (sessionId: string, summary: string) => void;
+  onStartLabeled?: (label: string) => void;
+  onBackfill?: (label: string, startedAt: string, endedAt: string) => void;
+  stopOnCommit?: boolean;
+  onToggleStopOnCommit?: () => void;
 }
 
 function RunningTimer({ startedAt }: { startedAt: string }) {
@@ -85,6 +91,10 @@ export default function ProgrammerScreen({
   onStopOffTask = noop,
   questions = [],
   onAnswerQuestion = noop,
+  onStartLabeled = noop,
+  onBackfill = noop,
+  stopOnCommit = false,
+  onToggleStopOnCommit = noop,
 }: ProgrammerScreenProps) {
   return (
     <div className="min-h-full bg-bg text-text font-sans">
@@ -225,18 +235,34 @@ export default function ProgrammerScreen({
           )}
         </div>
 
-        {/* Off-task session button */}
-        <button
-          type="button"
-          onClick={onStartOffTask}
-          className="mt-4 w-full rounded-lg border border-dashed border-hair2 text-text3 hover:text-text2 hover:border-text3 py-3 font-mono text-xs"
-        >
-          + off-task session
-        </button>
+        {/* Non-git activity: quick-start labels + same-day backfill */}
+        <AddActivity onStartLabeled={onStartLabeled} onBackfill={onBackfill} />
 
-        {/* Footer hint */}
-        <p className="mt-6 text-center font-mono text-[11px] text-text3">
-          sessions auto-detect activity from commits · stop to wrap with a one-line summary
+        {/* Footer: settings + hint */}
+        <div className="mt-6 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={onToggleStopOnCommit}
+            role="switch"
+            aria-checked={stopOnCommit}
+            className="inline-flex items-center gap-2 font-mono text-[11px] text-text3 hover:text-text2"
+          >
+            <span
+              className={`relative inline-block w-7 h-4 rounded-full border ${
+                stopOnCommit ? 'bg-activity-coding/25 border-activity-coding/60' : 'border-hair2'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-3 h-3 rounded-full ${
+                  stopOnCommit ? 'left-3.5 bg-activity-coding' : 'left-0.5 bg-text3'
+                }`}
+              />
+            </span>
+            auto-stop session on commit
+          </button>
+        </div>
+        <p className="mt-2 text-center font-mono text-[11px] text-text3">
+          one tap to start · one tap to end · summary auto-drafted from commits
         </p>
       </main>
     </div>

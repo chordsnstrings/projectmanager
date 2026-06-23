@@ -19,7 +19,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: StartSessionBody }>('/sessions', async (req, reply) => {
     const user = await requireUser(req, reply);
     if (!user) return;
-    const { taskId, offTaskLabel, intent } = req.body ?? {};
+    const { taskId, offTaskLabel, intent, startedAt: startStr, endedAt: endStr } = req.body ?? {};
     if (!taskId && !offTaskLabel) {
       return reply.code(400).send({ error: 'taskId_or_offTaskLabel_required' });
     }
@@ -27,14 +27,36 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null } });
       if (!task) return reply.code(404).send({ error: 'task_not_found' });
     }
+
+    // Backfill path: a completed session with explicit start/end — same day only.
+    let startedAt = new Date();
+    let endedAt: Date | null = null;
+    let isOpen = true;
+    if (startStr && endStr) {
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      const now = new Date();
+      const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e <= s) {
+        return reply.code(400).send({ error: 'invalid_range' });
+      }
+      if (s < todayStart || e > now) {
+        return reply.code(400).send({ error: 'backfill_today_only' });
+      }
+      startedAt = s;
+      endedAt = e;
+      isOpen = false;
+    }
+
     const session = await prisma.session.create({
       data: {
         userId: user.id,
         taskId: taskId ?? null,
         offTaskLabel: offTaskLabel ?? null,
         intent: intent ?? null,
-        startedAt: new Date(),
-        isOpen: true,
+        startedAt,
+        endedAt,
+        isOpen,
       },
       include: { segments: true },
     });
@@ -86,6 +108,32 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      return sessionToDTO(updated);
+    },
+  );
+
+  // ── Edit a session's summary / blocked flag after the fact (owner or admin) ─
+  app.patch<{ Params: { id: string }; Body: { summary?: string; blocked?: boolean } }>(
+    '/sessions/:id',
+    async (req, reply) => {
+      const user = await requireUser(req, reply);
+      if (!user) return;
+      const session = await prisma.session.findFirst({
+        where: { id: req.params.id, deletedAt: null },
+        include: { segments: true },
+      });
+      if (!session) return reply.code(404).send({ error: 'session_not_found' });
+      if (session.userId !== user.id && user.role !== 'admin') {
+        return reply.code(403).send({ error: 'forbidden' });
+      }
+      const data: { summary?: string; blocked?: boolean } = {};
+      if (typeof req.body?.summary === 'string') data.summary = req.body.summary;
+      if (typeof req.body?.blocked === 'boolean') data.blocked = req.body.blocked;
+      const updated = await prisma.session.update({
+        where: { id: session.id },
+        data,
+        include: { segments: true },
+      });
       return sessionToDTO(updated);
     },
   );

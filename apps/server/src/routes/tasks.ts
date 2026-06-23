@@ -6,6 +6,7 @@ import { requireUser } from '../auth/require';
 import { taskToDTO } from '../services/map';
 import { decryptToken } from '../auth/tokenCrypto';
 import { syncUserProjects } from '../github/userSync';
+import { autoStopOnCommit } from '../engine/reconcileFlags';
 
 const PAGE = 50;
 
@@ -54,6 +55,8 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     if (!token) return reply.code(409).send({ error: 'no_github_token', detail: 'Sign in again to refresh.' });
     try {
       const result = await syncUserProjects(prisma, token, user.id, row!.githubLogin);
+      // Honor "stop on commit" right away for the freshly-ingested commits.
+      await autoStopOnCommit(prisma).catch(() => {});
       return { synced: result.tasks, repos: result.repos };
     } catch (err) {
       req.log.warn({ err, userId: user.id }, 'refresh sync failed');
