@@ -34,6 +34,7 @@ export interface ProgrammerScreenProps {
   onStartNudge?: (nudge: NudgeDTO) => void;
   onDismissNudge?: (nudge: NudgeDTO) => void;
   onStartOffTask?: () => void;
+  onSignOut?: () => void;
 }
 
 const noop = () => {};
@@ -52,6 +53,7 @@ export default function ProgrammerScreen({
   onStartNudge = noop,
   onDismissNudge = noop,
   onStartOffTask = noop,
+  onSignOut = noop,
 }: ProgrammerScreenProps) {
   return (
     <div className="min-h-full bg-bg text-text font-sans">
@@ -64,6 +66,13 @@ export default function ProgrammerScreen({
             github · {login}
           </span>
           <span className="font-mono text-xs text-text3">synced {syncedAgo} ago</span>
+          <button
+            type="button"
+            onClick={() => onSignOut()}
+            className="font-mono text-xs text-text3 hover:text-text px-2 py-1 rounded border border-hair hover:border-hair2"
+          >
+            sign out
+          </button>
         </div>
       </header>
 

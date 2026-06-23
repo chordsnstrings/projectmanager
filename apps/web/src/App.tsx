@@ -19,6 +19,11 @@ import DayTimeline from './admin/DayTimeline';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
 
+async function signOut() {
+  await api('/auth/logout', { method: 'POST' }).catch(() => {});
+  window.location.href = '/';
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: 'loading' });
 
@@ -187,6 +192,7 @@ function DevApp({ me }: { me: Me }) {
         onStartOffTask={onStartOffTask}
         onStartNudge={onStartNudge}
         onDismissNudge={(n) => setDismissed((d) => new Set(d).add(n.id))}
+        onSignOut={signOut}
       />
     </Shell>
   );
@@ -216,11 +222,19 @@ function AdminApp({ me }: { me: Me }) {
           <span className="text-[15px] font-semibold tracking-tight">cadence</span>
           <span className="text-text3 font-mono text-xs">admin · {me.githubLogin}</span>
         </div>
-        {day && (
-          <button onClick={() => setDay(null)} className="font-mono text-xs text-text2 hover:text-text">
-            ← team
+        <div className="flex items-center gap-3">
+          {day && (
+            <button onClick={() => setDay(null)} className="font-mono text-xs text-text2 hover:text-text">
+              ← team
+            </button>
+          )}
+          <button
+            onClick={signOut}
+            className="font-mono text-xs text-text3 hover:text-text px-2 py-1 rounded border border-hair hover:border-hair2"
+          >
+            sign out
           </button>
-        )}
+        </div>
       </div>
       <div className="p-6 max-w-6xl mx-auto">
         {day ? (
