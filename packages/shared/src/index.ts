@@ -51,3 +51,214 @@ export interface Paginated<T> {
   items: T[];
   nextCursor: string | null;
 }
+
+// ── Tasks (§8 GET /tasks) ───────────────────────────────────────────────────
+export interface TaskDTO {
+  id: string;
+  repoFullName: string;
+  source: TaskSource;
+  githubNumber: number | null;
+  branch: string | null;
+  title: string;
+  status: TaskStatus;
+  estimateMinutes: number | null;
+  /** sum of this task's sessions, in minutes (computed) */
+  actualMinutes: number;
+  reopenCount: number;
+  /** origin label for the row, e.g. "#142", "PR #88", "feat/foo" */
+  origin: string;
+}
+
+// ── Sessions (§8) ───────────────────────────────────────────────────────────
+export interface ActivitySegmentDTO {
+  type: ActivityType;
+  source: ActivitySource;
+  startedAt: string;
+  endedAt: string;
+}
+
+export interface CommitDTO {
+  sha: string;
+  message: string;
+  additions: number | null;
+  deletions: number | null;
+  filesChanged: number | null;
+  occurredAt: string;
+}
+
+export interface SessionDTO {
+  id: string;
+  userId: string;
+  taskId: string | null;
+  offTaskLabel: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  isOpen: boolean;
+  intent: string | null;
+  summary: string | null;
+  blocked: boolean;
+  segments: ActivitySegmentDTO[];
+  /** dominant inferred activity (drives the 3px running-row edge, §9) */
+  inferredActivity: ActivityType | null;
+}
+
+export interface StartSessionBody {
+  taskId?: string;
+  offTaskLabel?: string;
+  intent?: string;
+}
+
+export interface StopSessionBody {
+  summary?: string;
+  blocked?: boolean;
+  markTaskDone?: boolean;
+}
+
+export interface DraftSummary {
+  /** detected line: "1h 12m · 3 commits · coding 80% / debugging 20%" */
+  detected: string;
+  durationMinutes: number;
+  commitCount: number;
+  /** fraction of time per activity type */
+  activitySplit: { type: ActivityType; fraction: number }[];
+  /** editable one-line summary auto-drafted from commits */
+  summary: string;
+  /** suggested "closes #N" toggles from commit/PR keywords */
+  closesIssues: number[];
+}
+
+export interface ActivityOverrideBody {
+  type: ActivityType;
+  startedAt: string;
+  endedAt: string;
+}
+
+// ── Nudges (§8 GET /nudges) ─────────────────────────────────────────────────
+export interface NudgeDTO {
+  id: string;
+  kind: 'commit_no_session';
+  repoFullName: string;
+  branch: string | null;
+  suggestedTaskId: string | null;
+  detail: string;
+  occurredAt: string;
+}
+
+// ── Flags (§8 GET /flags) ───────────────────────────────────────────────────
+export interface FlagDTO {
+  id: string;
+  type: FlagType;
+  userId: string;
+  sessionId: string | null;
+  taskId: string | null;
+  detail: string;
+  status: FlagStatus;
+  createdAt: string;
+}
+
+// ── Questions (§8) ──────────────────────────────────────────────────────────
+export interface QuestionDTO {
+  id: string;
+  adminUserId: string;
+  targetUserId: string;
+  taskId: string;
+  sessionId: string | null;
+  body: string;
+  blocksNext: boolean;
+  status: QuestionStatus;
+  answer: string | null;
+  createdAt: string;
+  answeredAt: string | null;
+}
+
+export interface RaiseQuestionBody {
+  targetUserId: string;
+  taskId: string;
+  sessionId?: string;
+  body: string;
+  blocksNext?: boolean;
+}
+
+export interface AnswerQuestionBody {
+  answer: string;
+}
+
+// ── Dashboard (§8/§9b) ──────────────────────────────────────────────────────
+export interface TeamMemberRollup {
+  userId: string;
+  githubLogin: string;
+  name: string | null;
+  avatarUrl: string | null;
+  /** union of session intervals, minutes */
+  activeElapsedMinutes: number;
+  /** sum of sessions, minutes (may exceed elapsed under concurrency) */
+  taskHoursMinutes: number;
+  sessionCount: number;
+  openFlagCount: number;
+  runningTaskTitles: string[];
+  lastActiveAt: string | null;
+  tasksClosed: number;
+  /** median actual/estimate ratio, or null if no estimates */
+  estimateAccuracy: number | null;
+}
+
+export interface TeamDashboard {
+  rangeStart: string;
+  rangeEnd: string;
+  members: TeamMemberRollup[];
+}
+
+/** One task lane in the per-person day timeline (§9b). */
+export interface TimelineLane {
+  taskId: string | null;
+  title: string;
+  origin: string;
+  repoFullName: string;
+  estimateMinutes: number | null;
+  actualMinutes: number;
+  varianceMinutes: number | null;
+  status: TaskStatus;
+  sessionCount: number;
+  reopenCount: number;
+  sessions: TimelineSession[];
+}
+
+export interface TimelineSession {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  isOpen: boolean;
+  intent: string | null;
+  summary: string | null;
+  segments: ActivitySegmentDTO[];
+  commits: CommitDTO[];
+  flagIds: string[];
+}
+
+export interface DayTimeline {
+  userId: string;
+  githubLogin: string;
+  date: string; // YYYY-MM-DD
+  dayStart: string;
+  dayEnd: string;
+  activeElapsedMinutes: number;
+  taskHoursMinutes: number;
+  sessionCount: number;
+  flags: FlagDTO[];
+  lanes: TimelineLane[];
+}
+
+export interface TrendPoint {
+  weekStart: string;
+  estimateAccuracy: number | null;
+  reworkRate: number | null;
+  flagCount: number;
+  cycleTimeMinutes: number | null;
+  touchTimeMinutes: number | null;
+  activityMix: Partial<Record<ActivityType, number>>;
+}
+
+export interface Trends {
+  userId: string;
+  points: TrendPoint[];
+}
