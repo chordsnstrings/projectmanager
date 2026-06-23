@@ -74,6 +74,7 @@ model User {
   email       String?
   avatarUrl   String?
   role        Role        @default(dev)
+  githubAccessToken String? // OAuth token, AES-256-GCM encrypted at rest (per-user sync)
   emails      UserEmail[]
   sessions    Session[]
   createdAt   DateTime    @default(now())

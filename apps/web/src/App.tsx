@@ -89,7 +89,10 @@ function DevApp({ me }: { me: Me }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // Kick a server-side resync from the user's OAuth token, then load.
+    api('/tasks/refresh', { method: 'POST' })
+      .catch(() => {})
+      .finally(() => void refresh());
     const id = setInterval(refresh, 30000);
     return () => clearInterval(id);
   }, [refresh]);

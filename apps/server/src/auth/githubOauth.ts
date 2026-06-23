@@ -23,8 +23,9 @@ export function buildAuthorizeUrl(state: string): string {
   u.searchParams.set('client_id', env.GITHUB_CLIENT_ID);
   u.searchParams.set('redirect_uri', `${env.APP_BASE_URL}/auth/github/callback`);
   u.searchParams.set('state', state);
-  // identity only; repo data arrives via the installation, not the user token
-  u.searchParams.set('scope', 'read:user user:email');
+  // identity + repo read so we can fetch the user's assigned issues/PRs on login
+  // (per-user sync). Classic `repo` is read/write — see tokenCrypto/userSync notes.
+  u.searchParams.set('scope', 'read:user user:email repo');
   return u.toString();
 }
 

@@ -4,10 +4,31 @@ import type { TaskStatus } from '@cadence/db';
 import type { Paginated, TaskDTO } from '@cadence/shared';
 import { requireUser } from '../auth/require';
 import { taskToDTO } from '../services/map';
+import { decryptToken } from '../auth/tokenCrypto';
+import { syncUserProjects } from '../github/userSync';
 
 const PAGE = 50;
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
+  // Re-sync the caller's projects from their stored OAuth token.
+  app.post('/tasks/refresh', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const row = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { githubAccessToken: true, githubLogin: true },
+    });
+    const token = decryptToken(row?.githubAccessToken);
+    if (!token) return reply.code(409).send({ error: 'no_github_token', detail: 'Sign in again to refresh.' });
+    try {
+      const result = await syncUserProjects(prisma, token, user.id, row!.githubLogin);
+      return { synced: result.tasks, repos: result.repos };
+    } catch (err) {
+      req.log.warn({ err, userId: user.id }, 'refresh sync failed');
+      return reply.code(502).send({ error: 'github_sync_failed' });
+    }
+  });
+
   app.get<{ Querystring: { status?: string; repo?: string; cursor?: string; userId?: string } }>(
     '/tasks',
     async (req, reply) => {

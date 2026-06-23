@@ -10,6 +10,8 @@ import {
   fetchGitHubUser,
   fetchUserEmails,
 } from '../auth/githubOauth';
+import { encryptToken } from '../auth/tokenCrypto';
+import { syncUserProjects } from '../github/userSync';
 
 const STATE_COOKIE = 'cad_oauth_state';
 
@@ -68,6 +70,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           // Promote bootstrap admins; never auto-demote anyone else here.
           ...(isBootstrapAdmin ? { role: 'admin' } : {}),
         },
+      });
+
+      // Persist the OAuth token (encrypted) so /tasks/refresh works without re-login.
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { githubAccessToken: encryptToken(token) },
+      });
+
+      // Seed the user's projects from their own token (best-effort; never blocks login).
+      syncUserProjects(prisma, token, user.id, gh.login).catch((err) => {
+        req.log.warn({ err, userId: user.id }, 'per-user project sync failed');
       });
 
       // Seed UserEmail aliases for verified addresses (commit-author matching, §4).
