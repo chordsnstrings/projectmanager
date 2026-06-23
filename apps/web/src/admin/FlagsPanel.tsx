@@ -26,16 +26,14 @@ const TYPE_CLASS: Record<FlagDTO['type'], string> = {
 
 function TypeBadge({ type }: { type: FlagDTO['type'] }) {
   return (
-    <span
-      className={`shrink-0 inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${TYPE_CLASS[type]}`}
-    >
+    <span className={`tag shrink-0 ${TYPE_CLASS[type]}`}>
       {TYPE_LABEL[type]}
     </span>
   );
 }
 
 function btn(extra: string): string {
-  return `min-h-[32px] inline-flex items-center justify-center rounded border px-2.5 font-mono text-xs transition-colors focus:outline-none focus:border-hair2 ${extra}`;
+  return `btn btn-sm ${extra}`;
 }
 
 function FlagRow({
@@ -62,14 +60,14 @@ function FlagRow({
   }
 
   return (
-    <li className="border-b border-hair last:border-b-0 px-4 py-3">
+    <li className="border-b border-hair last:border-b-0 px-4 sm:px-5 py-3.5 hover:bg-surface/25 transition-colors">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 flex flex-col gap-1">
+        <div className="min-w-0 flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <TypeBadge type={flag.type} />
             <span className="font-mono text-[11px] text-text3">{relativeTime(flag.createdAt)}</span>
           </div>
-          <p className="text-sm text-text2 break-words">{flag.detail}</p>
+          <p className="text-sm text-text2 leading-relaxed break-words">{flag.detail}</p>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
@@ -119,7 +117,7 @@ function FlagRow({
               }
             }}
             placeholder="Ask the dev about this flag…"
-            className="min-h-[32px] flex-1 rounded border border-hair bg-surface px-2.5 font-mono text-sm text-text placeholder:text-text3 focus:outline-none focus:border-hair2"
+            className="field min-h-[32px] flex-1 px-3 font-mono text-sm"
           />
           <button
             type="button"
@@ -141,15 +139,17 @@ function FlagRow({
 
 export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk }: FlagsPanelProps) {
   return (
-    <section className="rounded-lg border border-hair bg-panel overflow-hidden">
-      <header className="px-4 py-3 border-b border-hair flex items-center justify-between">
-        <h2 className="text-sm font-medium text-text">Flags</h2>
+    <section className="card overflow-hidden animate-fade-in">
+      <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-text tracking-tightish">Flags</h2>
         <span className="font-mono text-xs text-text3">{flags.length}</span>
       </header>
 
       {flags.length === 0 ? (
-        <div className="px-4 py-8 flex flex-col items-center justify-center gap-2 text-center">
-          <span className="w-2 h-2 rounded-full bg-success" aria-hidden />
+        <div className="px-4 py-14 flex flex-col items-center justify-center gap-3 text-center">
+          <span className="w-9 h-9 rounded-full border border-success/30 bg-success/5 inline-flex items-center justify-center" aria-hidden>
+            <span className="w-2 h-2 rounded-full bg-success" />
+          </span>
           <span className="text-sm text-text3">No open flags</span>
         </div>
       ) : (

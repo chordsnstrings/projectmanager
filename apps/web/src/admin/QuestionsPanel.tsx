@@ -5,7 +5,7 @@ function StatusBadge({ status }: { status: QuestionDTO['status'] }) {
   const open = status === 'open';
   return (
     <span
-      className={`shrink-0 inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide ${
+      className={`tag shrink-0 ${
         open ? 'text-brass border-brass/40 bg-brass/10' : 'text-success border-success/40 bg-success/10'
       }`}
     >
@@ -16,7 +16,7 @@ function StatusBadge({ status }: { status: QuestionDTO['status'] }) {
 
 function BlocksChip() {
   return (
-    <span className="shrink-0 inline-flex items-center rounded border border-danger/40 bg-danger/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-danger">
+    <span className="tag shrink-0 border-danger/40 bg-danger/10 text-danger">
       blocks next
     </span>
   );
@@ -24,7 +24,7 @@ function BlocksChip() {
 
 function QuestionRow({ q }: { q: QuestionDTO }) {
   return (
-    <li className="border-b border-hair last:border-b-0 px-4 py-3 flex flex-col gap-2">
+    <li className="border-b border-hair last:border-b-0 px-4 sm:px-5 py-3.5 flex flex-col gap-2 hover:bg-surface/25 transition-colors">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={q.status} />
         {q.blocksNext ? <BlocksChip /> : null}
@@ -33,7 +33,7 @@ function QuestionRow({ q }: { q: QuestionDTO }) {
         </span>
       </div>
 
-      <p className="text-sm text-text break-words">{q.body}</p>
+      <p className="text-sm text-text leading-relaxed break-words">{q.body}</p>
 
       {q.status === 'answered' && q.answer != null ? (
         <div className="ml-3 border-l-2 border-success/40 pl-3 flex flex-col gap-1">
@@ -55,14 +55,14 @@ export default function QuestionsPanel({ questions }: { questions: QuestionDTO[]
   );
 
   return (
-    <section className="rounded-lg border border-hair bg-panel overflow-hidden">
-      <header className="px-4 py-3 border-b border-hair flex items-center justify-between">
-        <h2 className="text-sm font-medium text-text">Questions</h2>
+    <section className="card overflow-hidden animate-fade-in">
+      <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-text tracking-tightish">Questions</h2>
         <span className="font-mono text-xs text-text3">{sorted.length}</span>
       </header>
 
       {sorted.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-text3">No questions raised.</div>
+        <div className="px-4 py-14 text-center text-sm text-text3">No questions raised.</div>
       ) : (
         <ul>
           {sorted.map((q) => (
