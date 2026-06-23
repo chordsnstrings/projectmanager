@@ -1,13 +1,17 @@
+import { useEffect, useState } from 'react';
 import type {
   ActivityType,
   CommitDTO,
   DraftSummary,
   NudgeDTO,
+  QuestionDTO,
   SessionDTO,
   TaskDTO,
 } from '@cadence/shared';
 import TaskRow, { type TaskRowState } from './TaskRow';
 import { Logo } from '../components/Logo';
+import { liveElapsed } from '../lib/format';
+import QuestionsForDev from './QuestionsForDev';
 
 /** Per-task UI state bundle resolved by the parent (no fetching here). */
 export interface TaskSessionState {
@@ -39,6 +43,22 @@ export interface ProgrammerScreenProps {
   onRefresh?: () => void;
   onRename?: (taskId: string, title: string) => void;
   syncing?: boolean;
+  /** running off-task sessions (no task row to control them from) */
+  offTaskRunning?: SessionDTO[];
+  /** stop a session directly (no wrap-up panel) — used for off-task */
+  onStopOffTask?: (sessionId: string) => void;
+  /** open questions the dev must answer (gates next completion) */
+  questions?: QuestionDTO[];
+  onAnswerQuestion?: (id: string, answer: string) => void;
+}
+
+function RunningTimer({ startedAt }: { startedAt: string }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => force((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return <span className="font-mono text-sm text-text tabular-nums">{liveElapsed(startedAt)}</span>;
 }
 
 const noop = () => {};
@@ -61,6 +81,10 @@ export default function ProgrammerScreen({
   onRefresh = noop,
   onRename = noop,
   syncing = false,
+  offTaskRunning = [],
+  onStopOffTask = noop,
+  questions = [],
+  onAnswerQuestion = noop,
 }: ProgrammerScreenProps) {
   return (
     <div className="min-h-full bg-bg text-text font-sans">
@@ -95,7 +119,10 @@ export default function ProgrammerScreen({
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-6">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        {/* Open questions the dev must answer (gates next completion) */}
+        <QuestionsForDev questions={questions} onAnswer={onAnswerQuestion} />
+
         {/* Detected-branch nudge banner */}
         {nudge && (
           <div className="mb-5 rounded-lg border border-brass/40 bg-brass/5 px-4 py-3 flex items-center gap-3">
@@ -123,6 +150,37 @@ export default function ProgrammerScreen({
             >
               Dismiss
             </button>
+          </div>
+        )}
+
+        {/* Running off-task sessions — only place they can be stopped */}
+        {offTaskRunning.length > 0 && (
+          <div className="mb-4 rounded-lg border border-hair2 bg-panel overflow-hidden">
+            <div className="px-4 py-2 border-b border-hair font-mono text-[11px] uppercase tracking-wide text-text3">
+              off-task running · {offTaskRunning.length}
+            </div>
+            {offTaskRunning.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center gap-3 px-4 py-2.5 border-b border-hair last:border-b-0"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 animate-pulse" aria-hidden />
+                <span className="text-sm text-text2 flex-1 truncate">
+                  {s.offTaskLabel ?? 'off-task'}
+                  {s.intent ? ` · ${s.intent}` : ''}
+                </span>
+                <RunningTimer startedAt={s.startedAt} />
+                <button
+                  type="button"
+                  onClick={() => onStopOffTask(s.id)}
+                  className="w-9 h-9 inline-flex items-center justify-center rounded border border-hair2 text-danger hover:bg-surface2"
+                  title="stop session"
+                  aria-label="stop off-task session"
+                >
+                  <span className="text-xs leading-none">■</span>
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

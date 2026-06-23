@@ -32,6 +32,13 @@ function fmtAccuracy(ratio: number | null): string {
   return `${ratio.toFixed(1)}×`;
 }
 
+/** Collapse repeated running titles: ["off-task","off-task"] → "off-task ×2". */
+function summarizeRunning(titles: string[]): string {
+  const counts = new Map<string, number>();
+  for (const t of titles) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts.entries()].map(([t, n]) => (n > 1 ? `${t} ×${n}` : t)).join(' · ');
+}
+
 function Stat({
   label,
   children,
@@ -90,7 +97,7 @@ export default function TeamOverview({ data, onSelectUser = noop }: TeamOverview
                         aria-hidden
                       />
                       <span className="text-xs text-text2 truncate">
-                        {m.runningTaskTitles.join(' · ')}
+                        {summarizeRunning(m.runningTaskTitles)}
                       </span>
                     </div>
                   ) : (

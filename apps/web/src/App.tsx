@@ -3,19 +3,26 @@ import type {
   ActivityType,
   DayTimeline as DayTimelineDTO,
   DraftSummary,
+  FlagDTO,
   Me,
   NudgeDTO,
   Paginated,
+  QuestionDTO,
   SessionDTO,
   TaskDTO,
   TeamDashboard,
+  Trends as TrendsDTO,
 } from '@cadence/shared';
 import { api, ApiError } from './lib/api';
 import { relativeTime } from './lib/format';
+import { downloadTeamCsv } from './lib/csv';
 import { Logo } from './components/Logo';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import DayTimeline from './admin/DayTimeline';
+import Trends from './admin/Trends';
+import FlagsPanel from './admin/FlagsPanel';
+import QuestionsPanel from './admin/QuestionsPanel';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
 
@@ -87,21 +94,32 @@ function DevApp({ me }: { me: Me }) {
   const [nudges, setNudges] = useState<NudgeDTO[]>([]);
   const [wrapping, setWrapping] = useState<Record<string, { session: SessionDTO; draft: DraftSummary }>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, a, n] = await Promise.all([
+    const [t, a, n, q] = await Promise.all([
       api<Paginated<TaskDTO>>('/tasks').then((p) => p.items).catch(() => [] as TaskDTO[]),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
+      api<QuestionDTO[]>('/questions?status=open').catch(() => [] as QuestionDTO[]),
     ]);
     setTasks(t);
     setActive(a);
     setNudges(n);
+    setQuestions(q);
     setLoaded(true);
   }, []);
+
+  const onAnswerQuestion = useCallback(
+    async (id: string, answer: string) => {
+      await api(`/questions/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }).catch(() => {});
+      await refresh();
+    },
+    [refresh],
+  );
 
   const doSync = useCallback(async () => {
     setSyncing(true);
@@ -173,6 +191,14 @@ function DevApp({ me }: { me: Me }) {
     [refresh],
   );
 
+  const onStopOffTask = useCallback(
+    async (sessionId: string) => {
+      await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' }).catch(() => {});
+      await refresh();
+    },
+    [refresh],
+  );
+
   const onStartOffTask = useCallback(async () => {
     await api<SessionDTO>('/sessions', { method: 'POST', body: JSON.stringify({ offTaskLabel: 'off-task' }) });
     await refresh();
@@ -225,6 +251,10 @@ function DevApp({ me }: { me: Me }) {
         onRefresh={doSync}
         onRename={onRename}
         onSignOut={signOut}
+        offTaskRunning={active.filter((s) => !s.taskId && s.isOpen)}
+        onStopOffTask={onStopOffTask}
+        questions={questions}
+        onAnswerQuestion={onAnswerQuestion}
       />
     </Shell>
   );
@@ -238,11 +268,18 @@ function shiftDate(d: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+type AdminTab = 'team' | 'flags' | 'questions';
+
 function AdminApp({ me }: { me: Me }) {
+  const [tab, setTab] = useState<AdminTab>('team');
   const [date, setDate] = useState(todayStr);
   const [team, setTeam] = useState<TeamDashboard | null>(null);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
+  const [trends, setTrends] = useState<TrendsDTO | null>(null);
+  const [personView, setPersonView] = useState<'day' | 'trends'>('day');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [flags, setFlags] = useState<FlagDTO[]>([]);
+  const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
   const isToday = date === todayStr();
 
@@ -255,34 +292,96 @@ function AdminApp({ me }: { me: Me }) {
       .finally(() => setLoaded(true));
   }, [date]);
 
+  const loadFlags = useCallback(
+    () => api<Paginated<FlagDTO>>('/flags').then((p) => setFlags(p.items)).catch(() => setFlags([])),
+    [],
+  );
+  const loadQuestions = useCallback(
+    () => api<QuestionDTO[]>('/questions').then(setQuestions).catch(() => setQuestions([])),
+    [],
+  );
+
   const loadDay = useCallback(
-    (userId: string) => {
-      api<DayTimelineDTO>(`/dashboard/user/${userId}/day?date=${date}`)
-        .then(setDay)
-        .catch(() => setDay(null));
-    },
+    (userId: string) =>
+      api<DayTimelineDTO>(`/dashboard/user/${userId}/day?date=${date}`).then(setDay).catch(() => setDay(null)),
     [date],
+  );
+  const loadTrends = useCallback(
+    (userId: string) =>
+      api<TrendsDTO>(`/dashboard/user/${userId}/trends`).then(setTrends).catch(() => setTrends(null)),
+    [],
   );
 
   useEffect(() => {
     void loadTeam();
-    // live-refresh only matters for the current day
     if (!isToday) return;
     const id = setInterval(loadTeam, 30000);
     return () => clearInterval(id);
   }, [loadTeam, isToday]);
 
-  // refetch the open person's day when the date changes
   useEffect(() => {
-    if (selectedUser) loadDay(selectedUser);
+    if (tab === 'flags') void loadFlags();
+    if (tab === 'questions') void loadQuestions();
+  }, [tab, loadFlags, loadQuestions]);
+
+  useEffect(() => {
+    if (selectedUser) void loadDay(selectedUser);
   }, [date, selectedUser, loadDay]);
 
   const selectUser = useCallback(
     (userId: string) => {
       setSelectedUser(userId);
-      loadDay(userId);
+      setPersonView('day');
+      void loadDay(userId);
+      void loadTrends(userId);
     },
-    [loadDay],
+    [loadDay, loadTrends],
+  );
+
+  const onResolve = useCallback(
+    (id: string) => {
+      void api(`/flags/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'resolved' }) }).then(loadFlags);
+    },
+    [loadFlags],
+  );
+  const onDismiss = useCallback(
+    (id: string) => {
+      void api(`/flags/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'dismissed' }) }).then(loadFlags);
+    },
+    [loadFlags],
+  );
+  const onAsk = useCallback(
+    (flag: FlagDTO, body: string) => {
+      if (!flag.taskId || !body.trim()) return;
+      void api('/questions', {
+        method: 'POST',
+        body: JSON.stringify({ targetUserId: flag.userId, taskId: flag.taskId, sessionId: flag.sessionId, body: body.trim() }),
+      }).then(() => {
+        void loadQuestions();
+        void loadFlags();
+      });
+    },
+    [loadFlags, loadQuestions],
+  );
+
+  const backToTeam = () => {
+    setSelectedUser(null);
+    setDay(null);
+    setTrends(null);
+  };
+
+  const tabBtn = (t: AdminTab, label: string) => (
+    <button
+      onClick={() => {
+        setTab(t);
+        backToTeam();
+      }}
+      className={`font-mono text-xs px-3 h-8 rounded border ${
+        tab === t ? 'border-brass/60 text-text bg-surface' : 'border-hair text-text3 hover:text-text2'
+      }`}
+    >
+      {label}
+    </button>
   );
 
   return (
@@ -292,75 +391,117 @@ function AdminApp({ me }: { me: Me }) {
           <Logo size={22} />
           <span className="text-text3 font-mono text-xs">admin · {me.githubLogin}</span>
         </div>
-        <div className="flex items-center gap-3">
-          {day && (
-            <button
-              onClick={() => {
-                setDay(null);
-                setSelectedUser(null);
-              }}
-              className="font-mono text-xs text-text2 hover:text-text"
-            >
-              ← team
-            </button>
-          )}
-          <button
-            onClick={signOut}
-            className="font-mono text-xs text-text3 hover:text-text px-2.5 h-8 rounded border border-hair hover:border-hair2"
-          >
-            sign out
-          </button>
-        </div>
+        <button
+          onClick={signOut}
+          className="font-mono text-xs text-text3 hover:text-text px-2.5 h-8 rounded border border-hair hover:border-hair2"
+        >
+          sign out
+        </button>
       </div>
 
-      {/* Date navigation — view any past day (and ranges via the API) */}
       <div className="px-4 sm:px-6 pt-4 max-w-6xl mx-auto w-full flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setDate((d) => shiftDate(d, -1))}
-          className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2"
-          aria-label="previous day"
-        >
-          ‹
-        </button>
-        <input
-          type="date"
-          value={date}
-          max={todayStr()}
-          onChange={(e) => setDate(e.target.value || todayStr())}
-          className="font-mono text-xs bg-surface border border-hair rounded px-2 h-8 text-text [color-scheme:dark]"
-        />
-        <button
-          onClick={() => setDate((d) => shiftDate(d, 1))}
-          disabled={isToday}
-          className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2 disabled:opacity-40"
-          aria-label="next day"
-        >
-          ›
-        </button>
-        {!isToday && (
-          <button
-            onClick={() => setDate(todayStr())}
-            className="font-mono text-xs px-2.5 h-8 rounded border border-hair hover:border-hair2 text-text2"
-          >
-            today
-          </button>
-        )}
-        <span className="font-mono text-[11px] text-text3 ml-auto">
-          {isToday ? 'live' : 'historical'}
-        </span>
+        {tabBtn('team', 'Team')}
+        {tabBtn('flags', 'Flags')}
+        {tabBtn('questions', 'Questions')}
       </div>
 
       <div className="p-4 sm:p-6 max-w-6xl mx-auto">
-        {day ? (
-          <DayTimeline data={day} />
-        ) : !loaded ? (
-          <div className="font-mono text-text3 text-sm">loading team…</div>
-        ) : team ? (
-          <TeamOverview data={team} onSelectUser={selectUser} />
+        {tab === 'flags' ? (
+          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} />
+        ) : tab === 'questions' ? (
+          <QuestionsPanel questions={questions} />
+        ) : selectedUser ? (
+          <div>
+            <div className="mb-4 flex items-center gap-2 flex-wrap">
+              <button onClick={backToTeam} className="font-mono text-xs text-text2 hover:text-text px-2.5 h-8 rounded border border-hair">
+                ← team
+              </button>
+              <div className="flex rounded border border-hair overflow-hidden">
+                <button
+                  onClick={() => setPersonView('day')}
+                  className={`font-mono text-xs px-3 h-8 ${personView === 'day' ? 'bg-surface text-text' : 'text-text3'}`}
+                >
+                  day
+                </button>
+                <button
+                  onClick={() => setPersonView('trends')}
+                  className={`font-mono text-xs px-3 h-8 border-l border-hair ${personView === 'trends' ? 'bg-surface text-text' : 'text-text3'}`}
+                >
+                  trends
+                </button>
+              </div>
+              {personView === 'day' && <DateNav date={date} setDate={setDate} />}
+            </div>
+            {personView === 'day' ? (
+              day ? <DayTimeline data={day} /> : <div className="font-mono text-text3 text-sm">loading day…</div>
+            ) : trends ? (
+              <Trends data={trends} />
+            ) : (
+              <div className="font-mono text-text3 text-sm">loading trends…</div>
+            )}
+          </div>
         ) : (
-          <div className="font-mono text-text3 text-sm">No team data yet.</div>
+          <div>
+            <div className="mb-4 flex items-center gap-2 flex-wrap">
+              <DateNav date={date} setDate={setDate} />
+              {team && team.members.length > 0 && (
+                <button
+                  onClick={() => downloadTeamCsv(team)}
+                  className="font-mono text-xs px-2.5 h-8 rounded border border-hair hover:border-hair2 text-text2 ml-auto"
+                >
+                  ↓ CSV
+                </button>
+              )}
+            </div>
+            {!loaded ? (
+              <div className="font-mono text-text3 text-sm">loading team…</div>
+            ) : team ? (
+              <TeamOverview data={team} onSelectUser={selectUser} />
+            ) : (
+              <div className="font-mono text-text3 text-sm">No team data yet.</div>
+            )}
+          </div>
         )}
       </div>
     </Shell>
+  );
+}
+
+function DateNav({ date, setDate }: { date: string; setDate: React.Dispatch<React.SetStateAction<string>> }) {
+  const isToday = date === todayStr();
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <button
+        onClick={() => setDate((d) => shiftDate(d, -1))}
+        className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2"
+        aria-label="previous day"
+      >
+        ‹
+      </button>
+      <input
+        type="date"
+        value={date}
+        max={todayStr()}
+        onChange={(e) => setDate(e.target.value || todayStr())}
+        className="font-mono text-xs bg-surface border border-hair rounded px-2 h-8 text-text [color-scheme:dark]"
+      />
+      <button
+        onClick={() => setDate((d) => shiftDate(d, 1))}
+        disabled={isToday}
+        className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2 disabled:opacity-40"
+        aria-label="next day"
+      >
+        ›
+      </button>
+      {!isToday && (
+        <button
+          onClick={() => setDate(todayStr())}
+          className="font-mono text-xs px-2.5 h-8 rounded border border-hair hover:border-hair2 text-text2"
+        >
+          today
+        </button>
+      )}
+      <span className="font-mono text-[11px] text-text3">{isToday ? 'live' : 'historical'}</span>
+    </div>
   );
 }
