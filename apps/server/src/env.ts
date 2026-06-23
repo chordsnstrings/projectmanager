@@ -44,6 +44,17 @@ export const env = {
   // robot). When unset, the /api/integrations/* endpoints return 503.
   CADENCE_API_TOKEN: process.env.CADENCE_API_TOKEN ?? '',
 
+  // Login-reminder emails (§ inactivity nudges). Thresholds in hours; the check
+  // runs at LOGIN_CHECK_HOUR (local) every day except Friday (excluded from the gap).
+  LOGIN_CHECK_HOUR: num('LOGIN_CHECK_HOUR', 9),
+  INACTIVE_REMIND_HOURS: num('INACTIVE_REMIND_HOURS', 24),
+  INACTIVE_URGENT_HOURS: num('INACTIVE_URGENT_HOURS', 48),
+  // Who gets the URGENT 48h alert (besides admins): comma-separated.
+  URGENT_NOTIFY_EMAILS: (process.env.URGENT_NOTIFY_EMAILS ?? 'arman@arks.ae')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
   // Tunables (§6/§11)
   IDLE_MINUTES: num('IDLE_MINUTES', 90),
   MAX_OPEN_HOURS: num('MAX_OPEN_HOURS', 8),

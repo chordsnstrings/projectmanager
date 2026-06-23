@@ -102,6 +102,29 @@ jobs:
       - { key: SMTP_PASS, scope: RUN_TIME, type: SECRET }
       - { key: MAIL_FROM, scope: RUN_TIME }
       - { key: DIGEST_TO, scope: RUN_TIME }
+  - name: login-check
+    kind: SCHEDULED
+    schedule:
+      cron: "0 * * * *" # hourly; acts once/day at LOGIN_CHECK_HOUR (local), never on Friday
+    github:
+      repo: chordsnstrings/projectmanager
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    environment_slug: node-js
+    build_command: npm ci && npm run build
+    run_command: npm run login-check
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    envs:
+      - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
+      - { key: APP_BASE_URL, scope: RUN_TIME }
+      - { key: SMTP_HOST, scope: RUN_TIME }
+      - { key: SMTP_PORT, scope: RUN_TIME }
+      - { key: SMTP_USER, scope: RUN_TIME, type: SECRET }
+      - { key: SMTP_PASS, scope: RUN_TIME, type: SECRET }
+      - { key: MAIL_FROM, scope: RUN_TIME }
+      - { key: URGENT_NOTIFY_EMAILS, scope: RUN_TIME }
+      - { key: LOGIN_CHECK_HOUR, scope: RUN_TIME }
 databases:
   - name: db
     engine: PG

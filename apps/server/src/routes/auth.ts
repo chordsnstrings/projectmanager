@@ -75,7 +75,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // Persist the OAuth token (encrypted) so /tasks/refresh works without re-login.
       await prisma.user.update({
         where: { id: user.id },
-        data: { githubAccessToken: encryptToken(token) },
+        data: { githubAccessToken: encryptToken(token), lastLoginAt: new Date() },
       });
 
       // Seed the user's projects from their own token (best-effort; never blocks login).

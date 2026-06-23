@@ -3,6 +3,7 @@ import { canViewUser, requireAdmin, requireUser } from '../auth/require';
 import { buildDayTimeline, buildTeamDashboard, buildTeamDay, buildTrends } from '../services/dashboard';
 import { mailConfigured, verifyMail } from '../email/mailer';
 import { sendAdminDigest, sendDevDigests } from '../scripts/digest';
+import { runLoginCheck } from '../scripts/loginCheck';
 
 function parseRange(q: { from?: string; to?: string }): { start: Date; end: Date } {
   const end = q.to ? new Date(q.to) : new Date();
@@ -66,5 +67,14 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     const adminRecipients = await sendAdminDigest();
     const devsSent = req.query.devs === '1' ? await sendDevDigests() : 0;
     return { verified, adminRecipients, devsSent };
+  });
+
+  // Run the login-reminder check now (admin only) — bypasses the daily/Friday
+  // gate so it can be tested on demand.
+  app.post('/dashboard/run-login-check', async (req, reply) => {
+    const admin = await requireAdmin(req, reply);
+    if (!admin) return;
+    if (!mailConfigured()) return reply.code(503).send({ error: 'smtp_not_configured' });
+    return runLoginCheck(false);
   });
 }

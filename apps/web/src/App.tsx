@@ -26,6 +26,7 @@ import Trends from './admin/Trends';
 import FlagsPanel from './admin/FlagsPanel';
 import AskAboutTask from './admin/AskAboutTask';
 import SendDigestButton from './admin/SendDigestButton';
+import RunLoginCheckButton from './admin/RunLoginCheckButton';
 import QuestionsPanel from './admin/QuestionsPanel';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
@@ -630,6 +631,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
               </div>
               <DateNav date={date} setDate={setDate} />
               <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                <RunLoginCheckButton />
                 <SendDigestButton />
                 {team && team.members.length > 0 && (
                   <button onClick={() => downloadTeamCsv(team)} className="btn btn-sm btn-ghost">

@@ -87,3 +87,36 @@ export function localDayRange(dateStr: string, tz: string): { start: Date; end: 
 export function localToday(tz: string, now: Date = new Date()): string {
   return localDateString(now, resolveTz(tz));
 }
+
+/** Local day-of-week (0=Sun … 5=Fri … 6=Sat) for the instant in tz. */
+export function localWeekday(date: Date, tz: string): number {
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: resolveTz(tz), weekday: 'short' }).format(date);
+  return { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[name] ?? 0;
+}
+
+/** Is the instant a Friday in tz? */
+export function isFriday(date: Date, tz: string): boolean {
+  return localWeekday(date, tz) === 5;
+}
+
+/**
+ * Hours elapsed between `from` and `to`, NOT counting any Friday (a non-working
+ * day): each whole local Friday calendar date strictly within the span subtracts
+ * 24h. So "no login for 48h excluding Friday" is honored across a weekend.
+ */
+export function inactiveHoursExcludingFridays(from: Date, to: Date, tz: string): number {
+  const z = resolveTz(tz);
+  const rawHours = (to.getTime() - from.getTime()) / 3_600_000;
+  if (rawHours <= 0) return 0;
+  // Discount each whole local Friday in (fromDate, toDate] by 24h. Use a midday
+  // instant per date to read the weekday safely across DST.
+  let fridays = 0;
+  let cursor = addDays(localDateString(from, z), 1);
+  const lastDate = localDateString(to, z);
+  for (let i = 0; i < 400 && cursor <= lastDate; i++) {
+    const midday = new Date(startOfLocalDay(cursor, z).getTime() + 12 * 3_600_000);
+    if (localWeekday(midday, z) === 5) fridays++;
+    cursor = addDays(cursor, 1);
+  }
+  return Math.max(0, rawHours - fridays * 24);
+}
