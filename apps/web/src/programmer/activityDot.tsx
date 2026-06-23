@@ -1,4 +1,5 @@
-import { ACTIVITY_COLORS, type ActivityType } from '@cadence/shared';
+import type { ActivityType } from '@cadence/shared';
+import { ACTIVITY_COLORS } from '../lib/activity';
 
 /** The faint neutral used when no activity has been inferred yet. */
 const NEUTRAL = '#686d77'; // text3

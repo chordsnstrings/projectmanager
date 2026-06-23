@@ -30,7 +30,9 @@ services:
     health_check:
       http_path: /healthz
     envs:
-      - { key: NODE_ENV, value: production, scope: RUN_AND_BUILD_TIME }
+      # NODE_ENV must NOT be production at BUILD time, or npm ci skips devDeps
+      # (tsc/vite/prisma) and the build fails. Production at run time only.
+      - { key: NODE_ENV, value: production, scope: RUN_TIME }
       - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
       - { key: APP_BASE_URL, value: ${APP_URL}, scope: RUN_TIME }
       - { key: SESSION_SECRET, scope: RUN_TIME, type: SECRET }
@@ -56,7 +58,7 @@ jobs:
   - name: reconcile
     kind: SCHEDULED
     schedule:
-      cron: "*/10 * * * *"
+      cron: "*/15 * * * *" # DO requires >= 15-min interval
     github:
       repo: chordsnstrings/projectmanager
       branch: main

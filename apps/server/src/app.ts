@@ -7,6 +7,11 @@ import type { HealthStatus } from '@cadence/shared';
 import { env } from './env';
 import { authRoutes } from './routes/auth';
 import { webhookRoutes } from './routes/webhooks';
+import { taskRoutes } from './routes/tasks';
+import { sessionRoutes } from './routes/sessions';
+import { flagRoutes } from './routes/flags';
+import { questionRoutes } from './routes/questions';
+import { dashboardRoutes } from './routes/dashboard';
 
 /** Build the Fastify app (exported so tests can import without binding a port). */
 export async function buildApp(): Promise<FastifyInstance> {
@@ -40,6 +45,11 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(authRoutes);
   await app.register(webhookRoutes);
+  await app.register(taskRoutes);
+  await app.register(sessionRoutes);
+  await app.register(flagRoutes);
+  await app.register(questionRoutes);
+  await app.register(dashboardRoutes);
 
   // ── Static SPA (apps/web/dist), with history-API fallback ─────────────────
   const webDist = resolve(__dirname, '../../web/dist');

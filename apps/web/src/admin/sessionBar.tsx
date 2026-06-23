@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ACTIVITY_COLORS, type CommitDTO, type TimelineSession } from '@cadence/shared';
+import type { CommitDTO, TimelineSession } from '@cadence/shared';
+import { ACTIVITY_COLORS } from '../lib/activity';
 import { fmtClock, fmtDuration } from '../lib/format';
 import { barGeom, pct, type TimeWindow } from './timeScale';
 
