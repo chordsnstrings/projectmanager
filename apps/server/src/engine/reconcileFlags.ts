@@ -17,7 +17,7 @@ export async function persistFlagCandidate(db: Db, c: FlagCandidate): Promise<bo
     },
   });
   if (existing) return false;
-  await db.flag.create({
+  const created = await db.flag.create({
     data: {
       type: c.type,
       userId: c.userId,
@@ -27,6 +27,8 @@ export async function persistFlagCandidate(db: Db, c: FlagCandidate): Promise<bo
       detail: c.detail,
     },
   });
+  // Lightweight audit trail (P6).
+  console.log(JSON.stringify({ audit: 'flag.created', flagId: created.id, type: c.type, userId: c.userId }));
   return true;
 }
 

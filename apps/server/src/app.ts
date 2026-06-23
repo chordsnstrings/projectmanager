@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyCookie from '@fastify/cookie';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyRateLimit from '@fastify/rate-limit';
 import type { HealthStatus } from '@cadence/shared';
 import { env } from './env';
 import { authRoutes } from './routes/auth';
@@ -35,6 +37,17 @@ export async function buildApp(): Promise<FastifyInstance> {
       }
     },
   );
+
+  // Security headers. CSP is disabled (the SPA loads hashed assets same-origin);
+  // other protections (frameguard, noSniff, etc.) stay on.
+  await app.register(fastifyHelmet, { contentSecurityPolicy: false });
+
+  // Rate limiting (P6): bounds auth + webhook abuse. Generous for 30s polling.
+  await app.register(fastifyRateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
+    allowList: (req) => req.url === '/healthz',
+  });
 
   await app.register(fastifyCookie, { secret: env.SESSION_SECRET || 'dev-insecure-secret' });
 

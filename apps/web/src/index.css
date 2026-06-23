@@ -20,6 +20,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Keyboard focus ring (P6) — visible only for keyboard nav, brass accent. */
+:focus-visible {
+  outline: 2px solid #c8a96a;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Honour reduced-motion preferences (§12 P6, wired early). */
 @media (prefers-reduced-motion: reduce) {
   *,

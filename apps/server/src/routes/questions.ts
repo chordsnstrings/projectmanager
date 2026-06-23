@@ -50,6 +50,10 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
         blocksNext: blocksNext ?? true,
       },
     });
+    req.log.info(
+      { audit: 'question.raised', questionId: q.id, by: admin.id, target: targetUserId, taskId, blocksNext: q.blocksNext },
+      'audit',
+    );
     return reply.code(201).send(toDTO(q));
   });
 
@@ -68,6 +72,7 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
         where: { id: q.id },
         data: { answer, status: 'answered', answeredAt: new Date() },
       });
+      req.log.info({ audit: 'question.answered', questionId: q.id, by: user.id }, 'audit');
       return toDTO(updated);
     },
   );
