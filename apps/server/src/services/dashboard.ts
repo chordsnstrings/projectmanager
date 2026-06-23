@@ -43,7 +43,7 @@ export async function buildTeamDashboard(
         startedAt: { lt: rangeEnd },
         OR: [{ endedAt: null }, { endedAt: { gt: rangeStart } }],
       },
-      include: { task: { select: { title: true } } },
+      include: { task: { select: { title: true, displayTitle: true } } },
     });
     const intervals: Interval[] = sessions.map((s) =>
       clip({ start: s.startedAt.getTime(), end: (s.endedAt ?? new Date(now)).getTime() }, startMs, endMs),
@@ -85,7 +85,7 @@ export async function buildTeamDashboard(
       openFlagCount,
       runningTaskTitles: sessions
         .filter((s) => s.isOpen)
-        .map((s) => s.task?.title ?? s.offTaskLabel ?? 'off-task'),
+        .map((s) => s.task?.displayTitle ?? s.task?.title ?? s.offTaskLabel ?? 'off-task'),
       lastActiveAt: lastSession ? new Date(lastSession).toISOString() : null,
       tasksClosed: closedTasks.length,
       estimateAccuracy: median(accuracies),
@@ -187,7 +187,7 @@ export async function buildDayTimeline(userId: string, date: string): Promise<Da
 
     lanes.push({
       taskId: task?.id ?? null,
-      title: task?.title ?? first.offTaskLabel ?? 'Off-task',
+      title: task?.displayTitle ?? task?.title ?? first.offTaskLabel ?? 'Off-task',
       origin: task ? taskOrigin(task) : 'off-task',
       repoFullName: task?.repo.fullName ?? '—',
       estimateMinutes: task?.estimateMinutes ?? null,

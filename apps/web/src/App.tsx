@@ -11,9 +11,9 @@ import type {
   TeamDashboard,
 } from '@cadence/shared';
 import { api, ApiError } from './lib/api';
-import ProgrammerScreen, {
-  type TaskSessionState,
-} from './programmer/ProgrammerScreen';
+import { relativeTime } from './lib/format';
+import { Logo } from './components/Logo';
+import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import DayTimeline from './admin/DayTimeline';
 
@@ -30,10 +30,7 @@ export default function App() {
   useEffect(() => {
     api<Me>('/me')
       .then((me) => setAuth({ kind: 'authed', me }))
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 401) setAuth({ kind: 'anon' });
-        else setAuth({ kind: 'anon' });
-      });
+      .catch(() => setAuth({ kind: 'anon' }));
   }, []);
 
   if (auth.kind === 'loading') return <Splash>connecting…</Splash>;
@@ -48,7 +45,14 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Splash({ children }: { children: React.ReactNode }) {
   return (
     <Shell>
-      <div className="h-screen grid place-items-center font-mono text-text2 text-sm">{children}</div>
+      <div className="h-screen grid place-items-center gap-4 text-center">
+        <div>
+          <div className="mb-3 flex justify-center">
+            <Logo size={26} />
+          </div>
+          <div className="font-mono text-text3 text-sm">{children}</div>
+        </div>
+      </div>
     </Shell>
   );
 }
@@ -56,15 +60,17 @@ function Splash({ children }: { children: React.ReactNode }) {
 function SignIn() {
   return (
     <Shell>
-      <div className="h-screen grid place-items-center">
-        <div className="rounded-xl border border-hair bg-panel p-8 text-center max-w-sm">
-          <div className="text-[15px] font-semibold tracking-tight mb-1">cadence</div>
+      <div className="min-h-screen grid place-items-center p-6">
+        <div className="rounded-xl border border-hair bg-panel p-8 text-center max-w-sm w-full">
+          <div className="mb-4 flex justify-center">
+            <Logo size={30} />
+          </div>
           <p className="text-text2 text-sm mb-6">
             Sessions are the clock. Git is the truth. Sign in to see your work.
           </p>
           <a
             href="/auth/github"
-            className="inline-block rounded-lg border border-hair2 bg-surface px-4 py-2 text-sm font-medium hover:bg-surface2"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-hair2 bg-surface px-4 h-11 text-sm font-medium hover:bg-surface2 w-full"
           >
             Connect GitHub
           </a>
@@ -81,26 +87,40 @@ function DevApp({ me }: { me: Me }) {
   const [nudges, setNudges] = useState<NudgeDTO[]>([]);
   const [wrapping, setWrapping] = useState<Record<string, { session: SessionDTO; draft: DraftSummary }>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [loaded, setLoaded] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     const [t, a, n] = await Promise.all([
-      api<Paginated<TaskDTO>>('/tasks').then((p) => p.items).catch(() => []),
-      api<SessionDTO[]>('/sessions/active').catch(() => []),
-      api<NudgeDTO[]>('/nudges').catch(() => []),
+      api<Paginated<TaskDTO>>('/tasks').then((p) => p.items).catch(() => [] as TaskDTO[]),
+      api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
+      api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
     ]);
     setTasks(t);
     setActive(a);
     setNudges(n);
+    setLoaded(true);
   }, []);
 
+  const doSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await api('/tasks/refresh', { method: 'POST' });
+      setLastSync(Date.now());
+    } catch {
+      /* ignore — show whatever's already synced */
+    } finally {
+      await refresh();
+      setSyncing(false);
+    }
+  }, [refresh]);
+
   useEffect(() => {
-    // Kick a server-side resync from the user's OAuth token, then load.
-    api('/tasks/refresh', { method: 'POST' })
-      .catch(() => {})
-      .finally(() => void refresh());
+    void doSync();
     const id = setInterval(refresh, 30000);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, [doSync, refresh]);
 
   const onStart = useCallback(
     async (taskId: string) => {
@@ -110,18 +130,19 @@ function DevApp({ me }: { me: Me }) {
     [refresh],
   );
 
-  const onStop = useCallback(async (sessionId: string) => {
-    // Transition to the wrap-up panel: fetch the auto-drafted summary first.
-    const session = active.find((s) => s.id === sessionId);
-    try {
-      const draft = await api<DraftSummary>(`/sessions/${sessionId}/draft-summary`);
-      if (session) setWrapping((w) => ({ ...w, [session.taskId ?? sessionId]: { session, draft } }));
-    } catch {
-      // no draft (e.g. off-task) — just stop
-      await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' });
-      await refresh();
-    }
-  }, [active, refresh]);
+  const onStop = useCallback(
+    async (sessionId: string) => {
+      const session = active.find((s) => s.id === sessionId);
+      try {
+        const draft = await api<DraftSummary>(`/sessions/${sessionId}/draft-summary`);
+        if (session) setWrapping((w) => ({ ...w, [session.taskId ?? sessionId]: { session, draft } }));
+      } catch {
+        await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' });
+        await refresh();
+      }
+    },
+    [active, refresh],
+  );
 
   const onSaveSummary = useCallback(
     async (sessionId: string, payload: { summary: string; blocked: boolean; closesIssues: number[] }) => {
@@ -165,22 +186,31 @@ function DevApp({ me }: { me: Me }) {
     [onStart, onStartOffTask],
   );
 
-  // Build per-task state: running (active) / wrapping / idle.
+  const onRename = useCallback(
+    async (taskId: string, title: string) => {
+      await api<TaskDTO>(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ title }) }).catch(() => {});
+      await refresh();
+    },
+    [refresh],
+  );
+
+  if (!loaded) return <Splash>loading your board…</Splash>;
+
   const sessionsByTask: Record<string, TaskSessionState> = {};
-  for (const s of active) {
-    if (s.taskId) sessionsByTask[s.taskId] = { state: 'running', session: s };
-  }
+  for (const s of active) if (s.taskId) sessionsByTask[s.taskId] = { state: 'running', session: s };
   for (const [taskId, w] of Object.entries(wrapping)) {
     sessionsByTask[taskId] = { state: 'wrapping', session: w.session, draft: w.draft };
   }
 
   const nudge = nudges.find((n) => !dismissed.has(n.id)) ?? null;
+  const syncedAgo = lastSync ? relativeTime(new Date(lastSync).toISOString()) : 'never';
 
   return (
     <Shell>
       <ProgrammerScreen
         login={me.githubLogin}
-        syncedAgo="just now"
+        syncedAgo={syncedAgo}
+        syncing={syncing}
         date={new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
         nudge={nudge}
         tasks={tasks}
@@ -192,6 +222,8 @@ function DevApp({ me }: { me: Me }) {
         onStartOffTask={onStartOffTask}
         onStartNudge={onStartNudge}
         onDismissNudge={(n) => setDismissed((d) => new Set(d).add(n.id))}
+        onRefresh={doSync}
+        onRename={onRename}
         onSignOut={signOut}
       />
     </Shell>
@@ -202,9 +234,14 @@ function DevApp({ me }: { me: Me }) {
 function AdminApp({ me }: { me: Me }) {
   const [team, setTeam] = useState<TeamDashboard | null>(null);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const load = () => api<TeamDashboard>('/dashboard/team').then(setTeam).catch(() => setTeam(null));
+    const load = () =>
+      api<TeamDashboard>('/dashboard/team')
+        .then(setTeam)
+        .catch(() => setTeam(null))
+        .finally(() => setLoaded(true));
     void load();
     const id = setInterval(load, 30000);
     return () => clearInterval(id);
@@ -217,9 +254,9 @@ function AdminApp({ me }: { me: Me }) {
 
   return (
     <Shell>
-      <div className="border-b border-hair px-6 py-4 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold tracking-tight">cadence</span>
+      <div className="border-b border-hair px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Logo size={22} />
           <span className="text-text3 font-mono text-xs">admin · {me.githubLogin}</span>
         </div>
         <div className="flex items-center gap-3">
@@ -230,19 +267,21 @@ function AdminApp({ me }: { me: Me }) {
           )}
           <button
             onClick={signOut}
-            className="font-mono text-xs text-text3 hover:text-text px-2 py-1 rounded border border-hair hover:border-hair2"
+            className="font-mono text-xs text-text3 hover:text-text px-2.5 h-8 rounded border border-hair hover:border-hair2"
           >
             sign out
           </button>
         </div>
       </div>
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
         {day ? (
           <DayTimeline data={day} />
+        ) : !loaded ? (
+          <div className="font-mono text-text3 text-sm">loading team…</div>
         ) : team ? (
           <TeamOverview data={team} onSelectUser={selectUser} />
         ) : (
-          <div className="font-mono text-text2 text-sm">loading team…</div>
+          <div className="font-mono text-text3 text-sm">No team data yet.</div>
         )}
       </div>
     </Shell>

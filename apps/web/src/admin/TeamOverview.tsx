@@ -114,6 +114,16 @@ export default function TeamOverview({ data, onSelectUser = noop }: TeamOverview
                   <Stat label="est acc">{fmtAccuracy(m.estimateAccuracy)}</Stat>
                 </div>
               </div>
+
+              {/* Mobile: same metrics as a compact wrapped strip (the grid above is hidden) */}
+              <div className="sm:hidden mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] text-text2 pl-9">
+                <span>active <span className="text-text">{fmtDuration(m.activeElapsedMinutes)}</span></span>
+                <span>task <span className="text-text">{fmtDuration(m.taskHoursMinutes)}</span></span>
+                <span>sess <span className="text-text">{m.sessionCount}</span></span>
+                <span className={m.openFlagCount > 0 ? 'text-danger' : ''}>flags <span className={m.openFlagCount > 0 ? 'text-danger' : 'text-text'}>{m.openFlagCount}</span></span>
+                <span>closed <span className="text-text">{m.tasksClosed}</span></span>
+                <span>acc <span className="text-text">{fmtAccuracy(m.estimateAccuracy)}</span></span>
+              </div>
             </button>
           ))
         )}

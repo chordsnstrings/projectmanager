@@ -118,7 +118,8 @@ model Task {
   source          TaskSource
   githubNumber    Int? // issue/PR number; null for pure-branch tasks
   branch          String? // branch name when source = branch/pr
-  title           String
+  title           String // canonical title synced from git (never user-edited)
+  displayTitle    String? // Cadence-local rename override (never pushed to GitHub)
   status          TaskStatus @default(todo)
   assigneeUserId  String?
   estimateMinutes Int? // §7

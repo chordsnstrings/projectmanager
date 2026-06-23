@@ -9,6 +9,11 @@ export function taskOrigin(t: Pick<Task, 'source' | 'githubNumber' | 'branch'>):
   return t.branch ?? 'branch';
 }
 
+/** The title shown in-app: the dev's local rename wins over the synced title. */
+export function taskDisplayTitle(t: Pick<Task, 'title' | 'displayTitle'>): string {
+  return t.displayTitle ?? t.title;
+}
+
 export function actualMinutes(
   sessions: Pick<Session, 'startedAt' | 'endedAt'>[],
   now = Date.now(),
@@ -30,7 +35,7 @@ export function taskToDTO(
     source: t.source,
     githubNumber: t.githubNumber,
     branch: t.branch,
-    title: t.title,
+    title: taskDisplayTitle(t),
     status: t.status,
     estimateMinutes: t.estimateMinutes,
     actualMinutes: actualMinutes(t.sessions),

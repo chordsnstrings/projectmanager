@@ -41,6 +41,8 @@ export interface TaskRowProps {
     sessionId: string,
     payload: { summary: string; blocked: boolean; closesIssues: number[] },
   ) => void;
+  /** rename the task in-app only (Cadence-local; not pushed to GitHub) */
+  onRename?: (taskId: string, title: string) => void;
 }
 
 const noop = () => {};
@@ -96,6 +98,7 @@ export default function TaskRow({
   onStop = noop,
   onOverrideActivity = noop,
   onSaveSummary = noop,
+  onRename = noop,
 }: TaskRowProps) {
   const running = state === 'running';
   const wrapping = state === 'wrapping';
@@ -117,7 +120,7 @@ export default function TaskRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Origin task={task} />
-            <span className="text-sm text-text font-medium truncate">{task.title}</span>
+            <TitleEditor task={task} onRename={onRename} />
           </div>
           <div className="mt-1 flex items-center gap-2 flex-wrap text-[11px]">
             <span className="font-mono text-text3 px-1.5 py-0.5 rounded border border-hair">
@@ -142,22 +145,23 @@ export default function TaskRow({
               <button
                 type="button"
                 onClick={() => onOverrideActivity(session.id, nextActivity(activity))}
-                className="inline-flex items-center gap-1.5 text-text2 hover:text-text"
-                title={`activity: ${activity ?? 'idle'} (click to override)`}
+                className="inline-flex items-center justify-center w-9 h-9 -mx-1 text-text2 hover:text-text"
+                title={`activity: ${activity ?? 'idle'} (tap to override)`}
+                aria-label="override activity"
               >
-                <ActivityDot activity={activity} />
+                <ActivityDot activity={activity} size={10} />
               </button>
-              <span className="text-sm text-text" aria-label="elapsed">
+              <span className="text-sm text-text tabular-nums" aria-label="elapsed">
                 <LiveTimer startedAt={session.startedAt} />
               </span>
               <button
                 type="button"
                 onClick={() => onStop(session.id)}
-                className="w-7 h-7 inline-flex items-center justify-center rounded border border-hair2 text-danger hover:bg-surface2"
+                className="w-9 h-9 inline-flex items-center justify-center rounded border border-hair2 text-danger hover:bg-surface2"
                 title="stop session"
                 aria-label="stop session"
               >
-                <span className="text-[10px] leading-none">■</span>
+                <span className="text-xs leading-none">■</span>
               </button>
             </>
           )}
@@ -165,7 +169,7 @@ export default function TaskRow({
             <button
               type="button"
               onClick={() => onStart(task.id)}
-              className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded border border-hair2 text-text2 hover:text-text hover:bg-surface2"
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded border border-hair2 text-text2 hover:text-text hover:bg-surface2"
               title="start session"
             >
               <span className="text-[10px] leading-none">▶</span>
@@ -187,6 +191,59 @@ export default function TaskRow({
         />
       )}
     </div>
+  );
+}
+
+/** Title with an inline rename (Cadence-local override). */
+function TitleEditor({
+  task,
+  onRename,
+}: {
+  task: TaskDTO;
+  onRename: NonNullable<TaskRowProps['onRename']>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(task.title);
+
+  if (editing) {
+    const commit = () => {
+      setEditing(false);
+      if (name.trim() && name.trim() !== task.title) onRename(task.id, name.trim());
+    };
+    return (
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') {
+            setName(task.title);
+            setEditing(false);
+          }
+        }}
+        className="text-sm bg-surface border border-hair2 rounded px-2 py-0.5 text-text focus:outline-none min-w-0 flex-1"
+        aria-label="rename task"
+      />
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 min-w-0">
+      <span className="text-sm text-text font-medium truncate">{task.title}</span>
+      <button
+        type="button"
+        onClick={() => {
+          setName(task.title);
+          setEditing(true);
+        }}
+        className="shrink-0 text-text3 hover:text-text2 w-7 h-7 -my-1 inline-flex items-center justify-center rounded"
+        title="rename (in Cadence only)"
+        aria-label="rename task"
+      >
+        <span className="text-[11px] leading-none">✎</span>
+      </button>
+    </span>
   );
 }
 

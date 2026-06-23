@@ -91,50 +91,58 @@ export default function DayTimeline({ data }: DayTimelineProps) {
         </div>
       </header>
 
-      {/* Axis */}
-      <div className="flex items-stretch border-b border-hair bg-bg/40">
-        <div className="w-56 shrink-0 border-r border-hair px-4 py-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-wide text-text3">task</span>
-        </div>
-        <div className="relative flex-1 min-w-0 py-1.5 px-2 h-7">
-          {ticks.map((t) => (
-            <span
-              key={t.left}
-              className="absolute top-1 font-mono text-[10px] text-text3 -translate-x-1/2"
-              style={{ left: `${t.left}%` }}
-            >
-              {t.label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Lanes with a concurrency band overlay aligned to the track region */}
-      <div className="relative">
-        {/* concurrency bands — offset by the 14rem (w-56) label column */}
-        <div className="pointer-events-none absolute inset-0 flex" aria-hidden>
-          <div className="w-56 shrink-0" />
-          <div className="relative flex-1 min-w-0 px-2">
-            <div className="relative h-full">
-              {bands.map((b, i) => (
+      {/* Horizontal scroll on small screens so the track stays legible. */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
+          {/* Axis */}
+          <div className="flex items-stretch border-b border-hair bg-bg/40">
+            <div className="w-40 sm:w-56 shrink-0 border-r border-hair px-4 py-1.5">
+              <span className="font-mono text-[10px] uppercase tracking-wide text-text3">task</span>
+            </div>
+            <div className="relative flex-1 min-w-0 py-1.5 px-2 h-7">
+              {ticks.map((t) => (
                 <span
-                  key={i}
-                  className="absolute top-0 bottom-0 bg-brass/[0.06] border-x border-brass/10"
-                  style={{ left: `${b.left}%`, width: `${b.width}%` }}
-                />
+                  key={t.left}
+                  className="absolute top-1 font-mono text-[10px] text-text3 -translate-x-1/2"
+                  style={{ left: `${t.left}%` }}
+                >
+                  {t.label}
+                </span>
               ))}
             </div>
           </div>
-        </div>
 
-        {data.lanes.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-text3">No sessions this day.</div>
-        ) : (
-          data.lanes.map((lane) => (
-            <Lane key={lane.taskId ?? lane.title} lane={lane} window={w} flaggedIds={flaggedIds} />
-          ))
-        )}
+          {/* Lanes with a concurrency band overlay aligned to the track region */}
+          <div className="relative">
+            {/* concurrency bands — offset by the label column */}
+            <div className="pointer-events-none absolute inset-0 flex" aria-hidden>
+              <div className="w-40 sm:w-56 shrink-0" />
+              <div className="relative flex-1 min-w-0 px-2">
+                <div className="relative h-full">
+                  {bands.map((b, i) => (
+                    <span
+                      key={i}
+                      className="absolute top-0 bottom-0 bg-brass/[0.06] border-x border-brass/10"
+                      style={{ left: `${b.left}%`, width: `${b.width}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {data.lanes.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-text3">No sessions this day.</div>
+            ) : (
+              data.lanes.map((lane) => (
+                <Lane key={lane.taskId ?? lane.title} lane={lane} window={w} flaggedIds={flaggedIds} />
+              ))
+            )}
+          </div>
+        </div>
       </div>
+      <p className="sm:hidden px-4 py-1.5 font-mono text-[10px] text-text3 border-t border-hair">
+        swipe the timeline horizontally · tap a bar for detail
+      </p>
 
       <footer className="px-4 py-2 border-t border-hair flex items-center gap-4 flex-wrap font-mono text-[10px] text-text3">
         <span className="inline-flex items-center gap-1.5">

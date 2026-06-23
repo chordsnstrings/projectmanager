@@ -1,0 +1,10 @@
+{
+  "name": "Cadence",
+  "short_name": "Cadence",
+  "icons": [
+    { "src": "/app-icon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ],
+  "theme_color": "#15171C",
+  "background_color": "#15171C",
+  "display": "standalone"
+}

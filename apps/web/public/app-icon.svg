@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Cadence">
+  <rect width="48" height="48" rx="11" fill="#15171C"/>
+  <rect x="9"    y="23" width="5" height="12" rx="2.5" fill="#C8A96A"/>
+  <rect x="17.5" y="14" width="5" height="21" rx="2.5" fill="#2BB68C"/>
+  <rect x="26"   y="26" width="5" height="9"  rx="2.5" fill="#C8A96A"/>
+  <rect x="34.5" y="19" width="5" height="16" rx="2.5" fill="#C8A96A"/>
+</svg>

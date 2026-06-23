@@ -65,57 +65,95 @@ export async function syncUserProjects(
   let tasks = 0;
 
   // 1) Issues + PRs assigned to the authenticated user (includes `repository`).
-  const assigned: any[] = await ghGet(token, '/issues?filter=assigned&state=open&per_page=100');
-  for (const item of assigned) {
-    const repo = item.repository;
-    if (!repo?.owner) continue;
-    const repoId = await upsertRepoFrom(db, repo);
-    repoIds.add(repoId);
-    const isPr = Boolean(item.pull_request);
-    const labels: string[] = (item.labels ?? []).map((l: any) => (typeof l === 'string' ? l : l.name));
-    await upsertTask(
-      db,
-      { repoId, source: isPr ? 'pr' : 'issue', githubNumber: item.number, branch: null },
-      {
-        title: item.title ?? `#${item.number}`,
-        status: isPr ? 'in_review' : 'in_progress',
-        assigneeUserId: userId,
-        estimateMinutes: parseEstimateFromLabels(labels),
-        closedAt: null,
-      },
-    );
-    tasks++;
+  try {
+    const assigned: any[] = await ghGet(token, '/issues?filter=assigned&state=open&per_page=100');
+    for (const item of assigned) {
+      const repo = item.repository;
+      if (!repo?.owner) continue;
+      const repoId = await upsertRepoFrom(db, repo);
+      repoIds.add(repoId);
+      const isPr = Boolean(item.pull_request);
+      const labels: string[] = (item.labels ?? []).map((l: any) => (typeof l === 'string' ? l : l.name));
+      await upsertTask(
+        db,
+        { repoId, source: isPr ? 'pr' : 'issue', githubNumber: item.number, branch: null },
+        {
+          title: item.title ?? `#${item.number}`,
+          status: isPr ? 'in_review' : 'in_progress',
+          assigneeUserId: userId,
+          estimateMinutes: parseEstimateFromLabels(labels),
+          closedAt: null,
+        },
+      );
+      tasks++;
+    }
+  } catch {
+    /* best-effort: a failing phase shouldn't lose the others */
   }
 
   // 2) Open PRs authored by the user (search). Resolve repo (id/default_branch) via cache.
   const repoCache = new Map<string, any>();
-  const q = encodeURIComponent(`is:open is:pr author:${login}`);
-  const search = await ghGet(token, `/search/issues?q=${q}&per_page=100`);
-  for (const item of search.items ?? []) {
-    const fullName = String(item.repository_url ?? '').replace(`${GH_API}/repos/`, '');
-    if (!fullName.includes('/')) continue;
-    let repo = repoCache.get(fullName);
-    if (!repo) {
-      try {
-        repo = await ghGet(token, `/repos/${fullName}`);
-        repoCache.set(fullName, repo);
-      } catch {
-        continue;
+  try {
+    const q = encodeURIComponent(`is:open is:pr author:${login}`);
+    const search = await ghGet(token, `/search/issues?q=${q}&per_page=100`);
+    for (const item of search.items ?? []) {
+      const fullName = String(item.repository_url ?? '').replace(`${GH_API}/repos/`, '');
+      if (!fullName.includes('/')) continue;
+      let repo = repoCache.get(fullName);
+      if (!repo) {
+        try {
+          repo = await ghGet(token, `/repos/${fullName}`);
+          repoCache.set(fullName, repo);
+        } catch {
+          continue;
+        }
       }
+      const repoId = await upsertRepoFrom(db, repo);
+      repoIds.add(repoId);
+      await upsertTask(
+        db,
+        { repoId, source: 'pr', githubNumber: item.number, branch: null },
+        {
+          title: item.title ?? `PR #${item.number}`,
+          status: item.draft ? 'in_progress' : 'in_review',
+          assigneeUserId: userId,
+          closedAt: null,
+        },
+      );
+      tasks++;
     }
-    const repoId = await upsertRepoFrom(db, repo);
-    repoIds.add(repoId);
-    await upsertTask(
-      db,
-      { repoId, source: 'pr', githubNumber: item.number, branch: null },
-      {
-        title: item.title ?? `PR #${item.number}`,
-        status: item.draft ? 'in_progress' : 'in_review',
-        assigneeUserId: userId,
-        closedAt: null,
-      },
+  } catch {
+    /* ignore */
+  }
+
+  // 3) The user's recently-active repos → one "branch" task per repo, titled by
+  //    the repo name. This is why a dev with no open issues/PRs still sees their
+  //    projects (named by repo) instead of resorting to "off-task".
+  try {
+    const repos: any[] = await ghGet(
+      token,
+      '/user/repos?sort=pushed&per_page=30&affiliation=owner,collaborator,organization_member',
     );
-    tasks++;
+    const cutoff = Date.now() - 60 * 86_400_000; // last 60 days of activity
+    for (const repo of repos) {
+      if (!repo?.owner || repo.archived || repo.disabled) continue;
+      if (repo.pushed_at && Date.parse(repo.pushed_at) < cutoff) continue;
+      const repoId = await upsertRepoFrom(db, repo);
+      repoIds.add(repoId);
+      await upsertTask(
+        db,
+        { repoId, source: 'branch', githubNumber: null, branch: repo.default_branch ?? 'main' },
+        {
+          title: repo.name ?? repo.full_name,
+          status: 'in_progress',
+          assigneeUserId: userId,
+          closedAt: null,
+        },
+      );
+      tasks++;
+    }
+  } catch {
+    /* ignore */
   }
 
   return { tasks, repos: repoIds.size };

@@ -33,7 +33,7 @@ export default function Lane({ lane, window: w, flaggedIds }: LaneProps) {
   return (
     <div className="flex items-stretch border-b border-hair last:border-b-0">
       {/* lane label */}
-      <div className="w-56 shrink-0 px-4 py-3 border-r border-hair">
+      <div className="w-40 sm:w-56 shrink-0 px-4 py-3 border-r border-hair">
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-text3">{lane.origin}</span>
           {lane.reopenCount > 0 && (

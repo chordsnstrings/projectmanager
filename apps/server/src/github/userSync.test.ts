@@ -39,13 +39,21 @@ describe('syncUserProjects', () => {
       ],
       '/search/issues': { items: [{ number: 7, title: 'My PR', repository_url: 'https://api.github.com/repos/acme/api', draft: false }] },
       '/repos/acme/api': { id: 11, full_name: 'acme/api', default_branch: 'main', owner },
+      '/user/repos': [
+        { id: 12, name: 'infra', full_name: 'acme/infra', default_branch: 'main', owner, pushed_at: new Date().toISOString() },
+        { id: 13, name: 'stale', full_name: 'acme/stale', default_branch: 'main', owner, pushed_at: '2000-01-01T00:00:00Z' },
+        { id: 14, name: 'archived', full_name: 'acme/archived', owner, archived: true },
+      ],
     });
 
     const { db, installUpsert, taskCreate } = fakeDb();
     const result = await syncUserProjects(db, 'tok', 'user1', 'me');
 
-    expect(result.tasks).toBe(3);
-    expect(result.repos).toBe(2);
+    // 1 issue + 1 assigned PR + 1 authored PR + 1 recent repo (stale/archived skipped)
+    expect(result.tasks).toBe(4);
+    expect(result.repos).toBe(3);
+    const branchTask = taskCreate.mock.calls.find((c) => c[0].data.source === 'branch')![0].data;
+    expect(branchTask).toMatchObject({ source: 'branch', title: 'infra', branch: 'main' });
     // synthetic installation id is the negated owner id
     expect(installUpsert.mock.calls[0]![0].where.githubInstallationId).toBe(-5n);
     const issueTask = taskCreate.mock.calls.find((c) => c[0].data.githubNumber === 1)![0].data;

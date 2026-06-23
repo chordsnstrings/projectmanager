@@ -10,6 +10,38 @@ import { syncUserProjects } from '../github/userSync';
 const PAGE = 50;
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
+  // Rename a task in-app only (Cadence-local override; never written to GitHub).
+  app.patch<{ Params: { id: string }; Body: { title?: string | null } }>(
+    '/tasks/:id',
+    async (req, reply) => {
+      const user = await requireUser(req, reply);
+      if (!user) return;
+      const task = await prisma.task.findFirst({
+        where: { id: req.params.id, deletedAt: null },
+        include: {
+          repo: { select: { fullName: true } },
+          sessions: { where: { deletedAt: null }, select: { startedAt: true, endedAt: true } },
+        },
+      });
+      if (!task) return reply.code(404).send({ error: 'task_not_found' });
+      if (user.role !== 'admin' && task.assigneeUserId !== user.id) {
+        return reply.code(403).send({ error: 'forbidden' });
+      }
+      const raw = req.body?.title;
+      // empty/blank → clear the override (revert to the synced title)
+      const displayTitle = raw && raw.trim() ? raw.trim().slice(0, 200) : null;
+      const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: { displayTitle },
+        include: {
+          repo: { select: { fullName: true } },
+          sessions: { where: { deletedAt: null }, select: { startedAt: true, endedAt: true } },
+        },
+      });
+      return taskToDTO(updated);
+    },
+  );
+
   // Re-sync the caller's projects from their stored OAuth token.
   app.post('/tasks/refresh', async (req, reply) => {
     const user = await requireUser(req, reply);
