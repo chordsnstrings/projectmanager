@@ -99,21 +99,21 @@ export default function ProgrammerScreen({
   return (
     <div className="min-h-full bg-bg text-text font-sans">
       {/* Header */}
-      <header className="border-b border-hair px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Logo size={20} />
-          <span className="hidden sm:inline text-sm font-medium text-text2">{date}</span>
+          <span className="hidden sm:inline text-sm font-medium text-text2 tracking-tightish truncate">{date}</span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 font-mono text-xs text-text2 px-2 py-1 rounded border border-hair">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs text-text2 px-2.5 h-8 rounded-lg border border-hair">
             <span className="w-1.5 h-1.5 rounded-full bg-success" aria-hidden />
-            <span className="hidden sm:inline">github · </span>{login}
+            <span className="hidden sm:inline text-text3">github · </span>{login}
           </span>
           <button
             type="button"
             onClick={() => onRefresh()}
             disabled={syncing}
-            className="inline-flex items-center gap-1.5 font-mono text-xs text-text3 hover:text-text px-2.5 h-8 rounded border border-hair hover:border-hair2 disabled:opacity-60"
+            className="btn btn-sm btn-quiet"
             title="re-sync your projects from GitHub"
           >
             <span className={syncing ? 'animate-spin' : ''} aria-hidden>↻</span>
@@ -122,26 +122,26 @@ export default function ProgrammerScreen({
           <button
             type="button"
             onClick={() => onSignOut()}
-            className="font-mono text-xs text-text3 hover:text-text px-2.5 h-8 rounded border border-hair hover:border-hair2"
+            className="btn btn-sm btn-ghost"
           >
             sign out
           </button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-7 sm:py-8 flex flex-col gap-5">
         {/* Open questions the dev must answer (gates next completion) */}
         <QuestionsForDev questions={questions} onAnswer={onAnswerQuestion} />
 
         {/* Detected-branch nudge banner */}
         {nudge && (
-          <div className="mb-5 rounded-lg border border-brass/40 bg-brass/5 px-4 py-3 flex items-center gap-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-brass shrink-0" aria-hidden />
+          <div className="rounded-xl border border-brass/30 bg-brass/[0.06] px-4 py-3.5 flex items-center gap-3 animate-fade-in">
+            <span className="w-2 h-2 rounded-full bg-brass shrink-0 animate-pulse" aria-hidden />
             <div className="min-w-0 flex-1">
-              <div className="text-sm text-text">
+              <div className="text-sm text-text font-medium tracking-tightish">
                 Detected work with no session
               </div>
-              <div className="font-mono text-xs text-text2 truncate">
+              <div className="font-mono text-xs text-text2 truncate mt-0.5">
                 {nudge.repoFullName}
                 {nudge.branch ? ` · ${nudge.branch}` : ''} — {nudge.detail}
               </div>
@@ -149,14 +149,14 @@ export default function ProgrammerScreen({
             <button
               type="button"
               onClick={() => onStartNudge(nudge)}
-              className="font-mono text-xs px-3 h-7 rounded bg-brass text-bg font-medium hover:opacity-90 shrink-0"
+              className="btn btn-sm btn-primary shrink-0"
             >
               Start
             </button>
             <button
               type="button"
               onClick={() => onDismissNudge(nudge)}
-              className="font-mono text-xs px-2.5 h-7 rounded border border-hair text-text3 hover:text-text hover:border-hair2 shrink-0"
+              className="btn btn-sm btn-quiet shrink-0"
             >
               Dismiss
             </button>
@@ -165,14 +165,14 @@ export default function ProgrammerScreen({
 
         {/* Running off-task sessions — only place they can be stopped */}
         {offTaskRunning.length > 0 && (
-          <div className="mb-4 rounded-lg border border-hair2 bg-panel overflow-hidden">
-            <div className="px-4 py-2 border-b border-hair font-mono text-[11px] uppercase tracking-wide text-text3">
+          <div className="card overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-hair label">
               off-task running · {offTaskRunning.length}
             </div>
             {offTaskRunning.map((s) => (
               <div
                 key={s.id}
-                className="flex items-center gap-3 px-4 py-2.5 border-b border-hair last:border-b-0"
+                className="flex items-center gap-3 px-4 py-3 border-b border-hair last:border-b-0"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 animate-pulse" aria-hidden />
                 <span className="text-sm text-text2 flex-1 truncate">
@@ -183,7 +183,7 @@ export default function ProgrammerScreen({
                 <button
                   type="button"
                   onClick={() => onStopOffTask(s.id)}
-                  className="w-9 h-9 inline-flex items-center justify-center rounded border border-hair2 text-danger hover:bg-surface2"
+                  className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-hair2 text-danger hover:bg-danger/10 transition-colors"
                   title="stop session"
                   aria-label="stop off-task session"
                 >
@@ -195,11 +195,14 @@ export default function ProgrammerScreen({
         )}
 
         {/* Task list */}
-        <div className="rounded-lg border border-hair bg-panel overflow-hidden">
+        <div className="card overflow-hidden">
           {tasks.length === 0 ? (
-            <div className="px-6 py-10 text-center">
-              <div className="text-sm text-text2 mb-1">No projects synced yet</div>
-              <p className="text-xs text-text3 max-w-sm mx-auto mb-4">
+            <div className="px-6 py-14 text-center flex flex-col items-center">
+              <span className="w-10 h-10 rounded-full border border-hair2 inline-flex items-center justify-center text-text3 mb-4" aria-hidden>
+                <span className="text-base leading-none">⌥</span>
+              </span>
+              <div className="text-sm text-text font-medium mb-1.5">No projects synced yet</div>
+              <p className="text-xs text-text3 leading-relaxed max-w-sm mx-auto mb-5">
                 Cadence pulls your assigned issues, open PRs, and recently-active repos from
                 GitHub. If this stays empty, you may have no recent activity on accessible repos.
               </p>
@@ -207,7 +210,7 @@ export default function ProgrammerScreen({
                 type="button"
                 onClick={() => onRefresh()}
                 disabled={syncing}
-                className="inline-flex items-center gap-1.5 font-mono text-xs px-3 h-9 rounded border border-hair2 text-text2 hover:text-text hover:bg-surface2 disabled:opacity-60"
+                className="btn btn-md btn-ghost"
               >
                 <span className={syncing ? 'animate-spin' : ''} aria-hidden>↻</span>
                 {syncing ? 'syncing…' : 'Refresh from GitHub'}
@@ -239,31 +242,31 @@ export default function ProgrammerScreen({
         <AddActivity onStartLabeled={onStartLabeled} onBackfill={onBackfill} />
 
         {/* Footer: settings + hint */}
-        <div className="mt-6 flex items-center justify-center">
+        <div className="mt-2 pt-5 border-t border-hair flex flex-col items-center gap-2.5">
           <button
             type="button"
             onClick={onToggleStopOnCommit}
             role="switch"
             aria-checked={stopOnCommit}
-            className="inline-flex items-center gap-2 font-mono text-[11px] text-text3 hover:text-text2"
+            className="inline-flex items-center gap-2 font-mono text-[11px] text-text3 hover:text-text2 transition-colors"
           >
             <span
-              className={`relative inline-block w-7 h-4 rounded-full border ${
+              className={`relative inline-block w-7 h-4 rounded-full border transition-colors ${
                 stopOnCommit ? 'bg-activity-coding/25 border-activity-coding/60' : 'border-hair2'
               }`}
             >
               <span
-                className={`absolute top-0.5 w-3 h-3 rounded-full ${
+                className={`absolute top-0.5 w-3 h-3 rounded-full transition-all ${
                   stopOnCommit ? 'left-3.5 bg-activity-coding' : 'left-0.5 bg-text3'
                 }`}
               />
             </span>
             auto-stop session on commit
           </button>
+          <p className="text-center font-mono text-[11px] text-text3">
+            one tap to start · one tap to end · summary auto-drafted from commits
+          </p>
         </div>
-        <p className="mt-2 text-center font-mono text-[11px] text-text3">
-          one tap to start · one tap to end · summary auto-drafted from commits
-        </p>
       </main>
     </div>
   );

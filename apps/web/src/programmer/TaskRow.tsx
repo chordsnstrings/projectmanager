@@ -20,10 +20,10 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 };
 
 const STATUS_TONE: Record<TaskStatus, string> = {
-  todo: 'text-text3 border-hair',
-  in_progress: 'text-activity-coding border-hair2',
-  in_review: 'text-activity-research border-hair2',
-  done: 'text-success border-hair',
+  todo: 'text-text3 border-hair bg-surface/40',
+  in_progress: 'text-activity-coding border-activity-coding/30 bg-activity-coding/5',
+  in_review: 'text-activity-research border-activity-research/30 bg-activity-research/5',
+  done: 'text-success border-success/30 bg-success/5',
 };
 
 export interface TaskRowProps {
@@ -78,9 +78,7 @@ function Origin({ task }: { task: TaskDTO }) {
 
 function StatusBadge({ status }: { status: TaskStatus }) {
   return (
-    <span
-      className={`font-mono text-[11px] px-1.5 py-0.5 rounded border ${STATUS_TONE[status]}`}
-    >
+    <span className={`tag ${STATUS_TONE[status]}`}>
       {STATUS_LABEL[status]}
     </span>
   );
@@ -112,18 +110,20 @@ export default function TaskRow({
 
   return (
     <div
-      className={`border-b border-hair last:border-b-0 ${running ? 'bg-surface/40' : ''}`}
+      className={`border-b border-hair last:border-b-0 transition-colors ${
+        running ? 'bg-surface/50' : 'hover:bg-surface/25'
+      }`}
       style={edgeStyle}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
         {/* Left: origin + title + meta */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Origin task={task} />
             <TitleEditor task={task} onRename={onRename} />
           </div>
-          <div className="mt-1 flex items-center gap-2 flex-wrap text-[11px]">
-            <span className="font-mono text-text3 px-1.5 py-0.5 rounded border border-hair">
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[11px]">
+            <span className="font-mono text-text3 px-1.5 py-0.5 rounded-md border border-hair bg-surface/40">
               {task.repoFullName}
             </span>
             <StatusBadge status={task.status} />
@@ -151,13 +151,13 @@ export default function TaskRow({
               >
                 <ActivityDot activity={activity} size={10} />
               </button>
-              <span className="text-sm text-text tabular-nums" aria-label="elapsed">
+              <span className="text-sm text-text tabular-nums font-mono" aria-label="elapsed">
                 <LiveTimer startedAt={session.startedAt} />
               </span>
               <button
                 type="button"
                 onClick={() => onStop(session.id)}
-                className="w-9 h-9 inline-flex items-center justify-center rounded border border-hair2 text-danger hover:bg-surface2"
+                className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-danger/40 text-danger hover:bg-danger/15 hover:border-danger/60 transition-colors"
                 title="stop session"
                 aria-label="stop session"
               >
@@ -169,15 +169,18 @@ export default function TaskRow({
             <button
               type="button"
               onClick={() => onStart(task.id)}
-              className="inline-flex items-center gap-1.5 px-3 h-9 rounded border border-hair2 text-text2 hover:text-text hover:bg-surface2"
+              className="btn btn-md btn-ghost hover:border-brass/40 hover:text-brass"
               title="start session"
             >
               <span className="text-[10px] leading-none">▶</span>
-              <span className="font-mono text-xs">start</span>
+              <span>start</span>
             </button>
           )}
           {wrapping && (
-            <span className="font-mono text-xs text-brass">wrapping…</span>
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs text-brass">
+              <span className="w-1.5 h-1.5 rounded-full bg-brass animate-pulse" aria-hidden />
+              wrapping…
+            </span>
           )}
         </div>
       </div>
@@ -223,21 +226,21 @@ function TitleEditor({
             setEditing(false);
           }
         }}
-        className="text-sm bg-surface border border-hair2 rounded px-2 py-0.5 text-text focus:outline-none min-w-0 flex-1"
+        className="field text-sm px-2 py-0.5 min-w-0 flex-1"
         aria-label="rename task"
       />
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 min-w-0">
-      <span className="text-sm text-text font-medium truncate">{task.title}</span>
+    <span className="group inline-flex items-center gap-1 min-w-0">
+      <span className="text-sm text-text font-medium truncate tracking-tightish">{task.title}</span>
       <button
         type="button"
         onClick={() => {
           setName(task.title);
           setEditing(true);
         }}
-        className="shrink-0 text-text3 hover:text-text2 w-7 h-7 -my-1 inline-flex items-center justify-center rounded"
+        className="shrink-0 text-text3 hover:text-text2 w-7 h-7 -my-1 inline-flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
         title="rename (in Cadence only)"
         aria-label="rename task"
       >
@@ -271,13 +274,13 @@ function WrapPanel({
     setCloses((cur) => (cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n]));
 
   return (
-    <div className="px-4 pb-4 pt-1 border-t border-hair bg-panel/60">
+    <div className="px-4 sm:px-5 pb-4 pt-3 border-t border-hair bg-surface/30 animate-fade-in">
       {/* detected line */}
       <div className="font-mono text-xs text-text2 mb-3">{draft.detected}</div>
 
       {/* activity split bar */}
       {draft.activitySplit.length > 0 && (
-        <div className="flex h-1.5 w-full overflow-hidden rounded mb-3">
+        <div className="flex h-1.5 w-full overflow-hidden rounded-full mb-3.5">
           {draft.activitySplit.map((s) => (
             <span
               key={s.type}
@@ -297,7 +300,7 @@ function WrapPanel({
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         placeholder="one-line summary…"
-        className="w-full bg-surface border border-hair rounded px-2.5 py-1.5 text-sm text-text placeholder:text-text3 focus:outline-none focus:border-hair2"
+        className="field w-full px-3 py-2 text-sm"
       />
 
       {/* chips */}
@@ -305,10 +308,10 @@ function WrapPanel({
         <button
           type="button"
           onClick={() => setBlocked((b) => !b)}
-          className={`font-mono text-[11px] px-2 py-0.5 rounded border ${
+          className={`tag transition-colors ${
             blocked
               ? 'text-danger border-danger/50 bg-danger/10'
-              : 'text-text3 border-hair hover:border-hair2'
+              : 'text-text3 border-hair hover:border-hair2 hover:text-text2'
           }`}
         >
           blocked
@@ -318,10 +321,10 @@ function WrapPanel({
             key={n}
             type="button"
             onClick={() => toggleClose(n)}
-            className={`font-mono text-[11px] px-2 py-0.5 rounded border ${
+            className={`tag transition-colors ${
               closes.includes(n)
                 ? 'text-success border-success/50 bg-success/10'
-                : 'text-text3 border-hair hover:border-hair2'
+                : 'text-text3 border-hair hover:border-hair2 hover:text-text2'
             }`}
           >
             closes #{n}
@@ -331,7 +334,7 @@ function WrapPanel({
         <button
           type="button"
           onClick={() => onSaveSummary(session.id, { summary, blocked, closesIssues: closes })}
-          className="ml-auto font-mono text-xs px-3 h-7 rounded bg-brass text-bg font-medium hover:opacity-90"
+          className="ml-auto btn btn-sm btn-primary"
         >
           Save
         </button>
@@ -339,7 +342,7 @@ function WrapPanel({
 
       {/* commit list */}
       {commits.length > 0 && (
-        <ul className="mt-3 space-y-1">
+        <ul className="mt-3.5 space-y-1.5 border-t border-hair pt-3">
           {commits.map((c) => (
             <li key={c.sha} className="font-mono text-[11px] text-text3 flex gap-2">
               <span className="text-text2">{c.sha.slice(0, 7)}</span>

@@ -53,11 +53,12 @@ function Splash({ children }: { children: React.ReactNode }) {
   return (
     <Shell>
       <div className="h-screen grid place-items-center gap-4 text-center">
-        <div>
-          <div className="mb-3 flex justify-center">
-            <Logo size={26} />
+        <div className="flex flex-col items-center gap-4 animate-fade-in">
+          <Logo size={26} />
+          <div className="flex items-center gap-2 font-mono text-text3 text-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-brass/70 animate-pulse" aria-hidden />
+            {children}
           </div>
-          <div className="font-mono text-text3 text-sm">{children}</div>
         </div>
       </div>
     </Shell>
@@ -68,16 +69,16 @@ function SignIn() {
   return (
     <Shell>
       <div className="min-h-screen grid place-items-center p-6">
-        <div className="rounded-xl border border-hair bg-panel p-8 text-center max-w-sm w-full">
-          <div className="mb-4 flex justify-center">
+        <div className="card p-8 sm:p-10 text-center max-w-sm w-full animate-fade-in">
+          <div className="mb-5 flex justify-center">
             <Logo size={30} />
           </div>
-          <p className="text-text2 text-sm mb-6">
+          <p className="text-text2 text-sm leading-relaxed mb-7 max-w-[26ch] mx-auto">
             Sessions are the clock. Git is the truth. Sign in to see your work.
           </p>
           <a
             href="/auth/github"
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-hair2 bg-surface px-4 h-11 text-sm font-medium hover:bg-surface2 w-full"
+            className="btn btn-lg btn-primary w-full text-sm"
           >
             Connect GitHub
           </a>
@@ -420,8 +421,10 @@ function AdminApp({ me }: { me: Me }) {
         setTab(t);
         backToTeam();
       }}
-      className={`font-mono text-xs px-3 h-8 rounded border ${
-        tab === t ? 'border-brass/60 text-text bg-surface' : 'border-hair text-text3 hover:text-text2'
+      className={`btn btn-sm ${
+        tab === t
+          ? 'border-hair2 text-text bg-surface2/80'
+          : 'border-transparent text-text3 hover:text-text2 hover:bg-surface2/50'
       }`}
     >
       {label}
@@ -430,46 +433,43 @@ function AdminApp({ me }: { me: Me }) {
 
   return (
     <Shell>
-      <div className="border-b border-hair px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Logo size={22} />
-          <span className="text-text3 font-mono text-xs">admin · {me.githubLogin}</span>
+          <span className="text-text3 font-mono text-xs truncate">admin · {me.githubLogin}</span>
         </div>
-        <button
-          onClick={signOut}
-          className="font-mono text-xs text-text3 hover:text-text px-2.5 h-8 rounded border border-hair hover:border-hair2"
-        >
+        <button onClick={signOut} className="btn btn-sm btn-ghost">
           sign out
         </button>
-      </div>
+      </header>
 
-      <div className="px-4 sm:px-6 pt-4 max-w-6xl mx-auto w-full flex items-center gap-2 flex-wrap">
+      <div className="px-4 sm:px-6 pt-5 max-w-6xl mx-auto w-full flex items-center gap-1.5 flex-wrap">
         {tabBtn('team', 'Team')}
         {tabBtn('flags', 'Flags')}
         {tabBtn('questions', 'Questions')}
       </div>
 
-      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+      <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
         {tab === 'flags' ? (
           <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} />
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} />
         ) : selectedUser ? (
-          <div>
-            <div className="mb-4 flex items-center gap-2 flex-wrap">
-              <button onClick={backToTeam} className="font-mono text-xs text-text2 hover:text-text px-2.5 h-8 rounded border border-hair">
+          <div className="animate-fade-in">
+            <div className="mb-5 flex items-center gap-2 flex-wrap">
+              <button onClick={backToTeam} className="btn btn-sm btn-ghost">
                 ← team
               </button>
-              <div className="flex rounded border border-hair overflow-hidden">
+              <div className="inline-flex rounded-lg border border-hair overflow-hidden">
                 <button
                   onClick={() => setPersonView('day')}
-                  className={`font-mono text-xs px-3 h-8 ${personView === 'day' ? 'bg-surface text-text' : 'text-text3'}`}
+                  className={`font-mono text-xs px-3.5 h-8 transition-colors ${personView === 'day' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
                 >
                   day
                 </button>
                 <button
                   onClick={() => setPersonView('trends')}
-                  className={`font-mono text-xs px-3 h-8 border-l border-hair ${personView === 'trends' ? 'bg-surface text-text' : 'text-text3'}`}
+                  className={`font-mono text-xs px-3.5 h-8 border-l border-hair transition-colors ${personView === 'trends' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
                 >
                   trends
                 </button>
@@ -478,7 +478,7 @@ function AdminApp({ me }: { me: Me }) {
               {personView === 'day' && openCount > 0 && (
                 <button
                   onClick={endOpenSessions}
-                  className="font-mono text-xs px-2.5 h-8 rounded border border-danger/50 text-danger hover:bg-danger/10 ml-auto"
+                  className="btn btn-sm border-danger/40 text-danger hover:bg-danger/10 ml-auto"
                   title="stop all of this person's open sessions"
                 >
                   ■ end {openCount} open
@@ -489,33 +489,33 @@ function AdminApp({ me }: { me: Me }) {
               day ? (
                 <DayTimeline data={day} onAskQuestion={onAskQuestion} />
               ) : (
-                <div className="font-mono text-text3 text-sm">loading day…</div>
+                <Loading>loading day…</Loading>
               )
             ) : trends ? (
               <Trends data={trends} />
             ) : (
-              <div className="font-mono text-text3 text-sm">loading trends…</div>
+              <Loading>loading trends…</Loading>
             )}
           </div>
         ) : (
-          <div>
-            <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <div className="animate-fade-in">
+            <div className="mb-5 flex items-center gap-2 flex-wrap">
               <DateNav date={date} setDate={setDate} />
               {team && team.members.length > 0 && (
                 <button
                   onClick={() => downloadTeamCsv(team)}
-                  className="font-mono text-xs px-2.5 h-8 rounded border border-hair hover:border-hair2 text-text2 ml-auto"
+                  className="btn btn-sm btn-ghost ml-auto"
                 >
                   ↓ CSV
                 </button>
               )}
             </div>
             {!loaded ? (
-              <div className="font-mono text-text3 text-sm">loading team…</div>
+              <Loading>loading team…</Loading>
             ) : team ? (
               <TeamOverview data={team} onSelectUser={selectUser} />
             ) : (
-              <div className="font-mono text-text3 text-sm">No team data yet.</div>
+              <EmptyState>No team data yet.</EmptyState>
             )}
           </div>
         )}
@@ -524,13 +524,30 @@ function AdminApp({ me }: { me: Me }) {
   );
 }
 
+function Loading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="card px-6 py-12 flex items-center justify-center gap-2 animate-fade-in">
+      <span className="w-1.5 h-1.5 rounded-full bg-brass/70 animate-pulse" aria-hidden />
+      <span className="font-mono text-text3 text-sm">{children}</span>
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="card px-6 py-12 text-center font-mono text-sm text-text3 animate-fade-in">
+      {children}
+    </div>
+  );
+}
+
 function DateNav({ date, setDate }: { date: string; setDate: React.Dispatch<React.SetStateAction<string>> }) {
   const isToday = date === todayStr();
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       <button
         onClick={() => setDate((d) => shiftDate(d, -1))}
-        className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2"
+        className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-hair hover:border-hair2 hover:bg-surface2/60 text-text2 transition-colors"
         aria-label="previous day"
       >
         ‹
@@ -540,12 +557,12 @@ function DateNav({ date, setDate }: { date: string; setDate: React.Dispatch<Reac
         value={date}
         max={todayStr()}
         onChange={(e) => setDate(e.target.value || todayStr())}
-        className="font-mono text-xs bg-surface border border-hair rounded px-2 h-8 text-text [color-scheme:dark]"
+        className="field font-mono text-xs px-2.5 h-8 [color-scheme:dark]"
       />
       <button
         onClick={() => setDate((d) => shiftDate(d, 1))}
         disabled={isToday}
-        className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2 disabled:opacity-40"
+        className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-hair hover:border-hair2 hover:bg-surface2/60 text-text2 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
         aria-label="next day"
       >
         ›
@@ -553,12 +570,15 @@ function DateNav({ date, setDate }: { date: string; setDate: React.Dispatch<Reac
       {!isToday && (
         <button
           onClick={() => setDate(todayStr())}
-          className="font-mono text-xs px-2.5 h-8 rounded border border-hair hover:border-hair2 text-text2"
+          className="btn btn-sm btn-ghost"
         >
           today
         </button>
       )}
-      <span className="font-mono text-[11px] text-text3">{isToday ? 'live' : 'historical'}</span>
+      <span className="ml-1 inline-flex items-center gap-1.5 font-mono text-[11px] text-text3">
+        <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-success animate-pulse' : 'bg-text3'}`} aria-hidden />
+        {isToday ? 'live' : 'historical'}
+      </span>
     </div>
   );
 }
