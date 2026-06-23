@@ -1,7 +1,9 @@
-import type { DayTimeline as DayTimelineDTO } from '@cadence/shared';
+import { useState } from 'react';
+import type { DayTimeline as DayTimelineDTO, TimelineSession } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
 import { hourTicks, makeWindow, pct, type TimeWindow } from './timeScale';
 import Lane from './lane';
+import SessionDetail from './SessionDetail';
 
 export interface DayTimelineProps {
   data: DayTimelineDTO;
@@ -67,6 +69,11 @@ export default function DayTimeline({ data }: DayTimelineProps) {
   const w = makeWindow(data.dayStart, data.dayEnd);
   const ticks = hourTicks(w);
   const bands = concurrentBands(data, w);
+  const [selected, setSelected] = useState<TimelineSession | null>(null);
+  const selectedLaneTitle =
+    selected != null
+      ? (data.lanes.find((l) => l.sessions.some((s) => s.id === selected.id))?.title ?? 'session')
+      : '';
   // Unresolved flags drive the danger markers on bars.
   const flaggedIds = new Set(
     data.flags.filter((f) => f.status === 'open' && f.sessionId).map((f) => f.sessionId as string),
@@ -134,12 +141,25 @@ export default function DayTimeline({ data }: DayTimelineProps) {
               <div className="px-4 py-8 text-center text-sm text-text3">No sessions this day.</div>
             ) : (
               data.lanes.map((lane) => (
-                <Lane key={lane.taskId ?? lane.title} lane={lane} window={w} flaggedIds={flaggedIds} />
+                <Lane
+                  key={lane.taskId ?? lane.title}
+                  lane={lane}
+                  window={w}
+                  flaggedIds={flaggedIds}
+                  selectedId={selected?.id ?? null}
+                  onSelect={setSelected}
+                />
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* Selected-session detail — rendered in normal flow (no clipping). */}
+      {selected && (
+        <SessionDetail session={selected} laneTitle={selectedLaneTitle} onClose={() => setSelected(null)} />
+      )}
+
       <p className="sm:hidden px-4 py-1.5 font-mono text-[10px] text-text3 border-t border-hair">
         swipe the timeline horizontally · tap a bar for detail
       </p>

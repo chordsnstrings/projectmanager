@@ -1,4 +1,4 @@
-import type { TaskStatus, TimelineLane } from '@cadence/shared';
+import type { TaskStatus, TimelineLane, TimelineSession } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
 import { hourTicks, type TimeWindow } from './timeScale';
 import SessionBar from './sessionBar';
@@ -14,6 +14,8 @@ export interface LaneProps {
   lane: TimelineLane;
   window: TimeWindow;
   flaggedIds: Set<string>;
+  selectedId: string | null;
+  onSelect: (session: TimelineSession) => void;
 }
 
 function Variance({ minutes }: { minutes: number | null }) {
@@ -28,7 +30,7 @@ function Variance({ minutes }: { minutes: number | null }) {
   );
 }
 
-export default function Lane({ lane, window: w, flaggedIds }: LaneProps) {
+export default function Lane({ lane, window: w, flaggedIds, selectedId, onSelect }: LaneProps) {
   const ticks = hourTicks(w);
   return (
     <div className="flex items-stretch border-b border-hair last:border-b-0">
@@ -66,7 +68,14 @@ export default function Lane({ lane, window: w, flaggedIds }: LaneProps) {
         {/* the bars region (absolute children) */}
         <div className="relative h-6">
           {lane.sessions.map((s) => (
-            <SessionBar key={s.id} session={s} window={w} flaggedIds={flaggedIds} />
+            <SessionBar
+              key={s.id}
+              session={s}
+              window={w}
+              flaggedIds={flaggedIds}
+              selected={s.id === selectedId}
+              onSelect={onSelect}
+            />
           ))}
         </div>
       </div>

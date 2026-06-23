@@ -231,26 +231,59 @@ function DevApp({ me }: { me: Me }) {
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
+const todayStr = () => new Date().toISOString().slice(0, 10);
+function shiftDate(d: string, delta: number): string {
+  const dt = new Date(`${d}T00:00:00Z`);
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
 function AdminApp({ me }: { me: Me }) {
+  const [date, setDate] = useState(todayStr);
   const [team, setTeam] = useState<TeamDashboard | null>(null);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const isToday = date === todayStr();
+
+  const loadTeam = useCallback(() => {
+    const from = `${date}T00:00:00.000Z`;
+    const to = `${date}T23:59:59.999Z`;
+    return api<TeamDashboard>(`/dashboard/team?from=${from}&to=${to}`)
+      .then(setTeam)
+      .catch(() => setTeam(null))
+      .finally(() => setLoaded(true));
+  }, [date]);
+
+  const loadDay = useCallback(
+    (userId: string) => {
+      api<DayTimelineDTO>(`/dashboard/user/${userId}/day?date=${date}`)
+        .then(setDay)
+        .catch(() => setDay(null));
+    },
+    [date],
+  );
 
   useEffect(() => {
-    const load = () =>
-      api<TeamDashboard>('/dashboard/team')
-        .then(setTeam)
-        .catch(() => setTeam(null))
-        .finally(() => setLoaded(true));
-    void load();
-    const id = setInterval(load, 30000);
+    void loadTeam();
+    // live-refresh only matters for the current day
+    if (!isToday) return;
+    const id = setInterval(loadTeam, 30000);
     return () => clearInterval(id);
-  }, []);
+  }, [loadTeam, isToday]);
 
-  const selectUser = useCallback((userId: string) => {
-    const date = new Date().toISOString().slice(0, 10);
-    api<DayTimelineDTO>(`/dashboard/user/${userId}/day?date=${date}`).then(setDay).catch(() => setDay(null));
-  }, []);
+  // refetch the open person's day when the date changes
+  useEffect(() => {
+    if (selectedUser) loadDay(selectedUser);
+  }, [date, selectedUser, loadDay]);
+
+  const selectUser = useCallback(
+    (userId: string) => {
+      setSelectedUser(userId);
+      loadDay(userId);
+    },
+    [loadDay],
+  );
 
   return (
     <Shell>
@@ -261,7 +294,13 @@ function AdminApp({ me }: { me: Me }) {
         </div>
         <div className="flex items-center gap-3">
           {day && (
-            <button onClick={() => setDay(null)} className="font-mono text-xs text-text2 hover:text-text">
+            <button
+              onClick={() => {
+                setDay(null);
+                setSelectedUser(null);
+              }}
+              className="font-mono text-xs text-text2 hover:text-text"
+            >
               ← team
             </button>
           )}
@@ -273,6 +312,44 @@ function AdminApp({ me }: { me: Me }) {
           </button>
         </div>
       </div>
+
+      {/* Date navigation — view any past day (and ranges via the API) */}
+      <div className="px-4 sm:px-6 pt-4 max-w-6xl mx-auto w-full flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setDate((d) => shiftDate(d, -1))}
+          className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2"
+          aria-label="previous day"
+        >
+          ‹
+        </button>
+        <input
+          type="date"
+          value={date}
+          max={todayStr()}
+          onChange={(e) => setDate(e.target.value || todayStr())}
+          className="font-mono text-xs bg-surface border border-hair rounded px-2 h-8 text-text [color-scheme:dark]"
+        />
+        <button
+          onClick={() => setDate((d) => shiftDate(d, 1))}
+          disabled={isToday}
+          className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair hover:border-hair2 text-text2 disabled:opacity-40"
+          aria-label="next day"
+        >
+          ›
+        </button>
+        {!isToday && (
+          <button
+            onClick={() => setDate(todayStr())}
+            className="font-mono text-xs px-2.5 h-8 rounded border border-hair hover:border-hair2 text-text2"
+          >
+            today
+          </button>
+        )}
+        <span className="font-mono text-[11px] text-text3 ml-auto">
+          {isToday ? 'live' : 'historical'}
+        </span>
+      </div>
+
       <div className="p-4 sm:p-6 max-w-6xl mx-auto">
         {day ? (
           <DayTimeline data={day} />
