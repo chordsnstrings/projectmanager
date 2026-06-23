@@ -216,6 +216,37 @@ export interface TeamDashboard {
   members: TeamMemberRollup[];
 }
 
+/** Compact session for the multi-member team day view (shared wall-clock axis). */
+export interface TeamDaySession {
+  id: string;
+  startedAt: string;
+  endedAt: string | null;
+  isOpen: boolean;
+  title: string; // task display title / title, or off-task label
+  segments: ActivitySegmentDTO[];
+}
+
+export interface TeamDayMember {
+  userId: string;
+  githubLogin: string;
+  name: string | null;
+  avatarUrl: string | null;
+  activeElapsedMinutes: number;
+  sessionCount: number;
+  openFlagCount: number;
+  runningTitles: string[];
+  sessions: TeamDaySession[];
+}
+
+/** One day across the whole team — one row per member on a shared time axis. */
+export interface TeamDay {
+  date: string; // YYYY-MM-DD (the admin's local day)
+  timezone: string; // IANA tz the axis is expressed in (the admin's)
+  dayStart: string;
+  dayEnd: string;
+  members: TeamDayMember[];
+}
+
 /** One task lane in the per-person day timeline (§9b). */
 export interface TimelineLane {
   taskId: string | null;

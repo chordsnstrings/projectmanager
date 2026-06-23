@@ -5,6 +5,8 @@ import type {
   DayTimeline,
   FlagDTO,
   TeamDashboard,
+  TeamDay,
+  TeamDayMember,
   TeamMemberRollup,
   TimelineLane,
   TimelineSession,
@@ -96,6 +98,73 @@ export async function buildTeamDashboard(
   return {
     rangeStart: rangeStart.toISOString(),
     rangeEnd: rangeEnd.toISOString(),
+    members,
+  };
+}
+
+/**
+ * The whole team's day on one shared wall-clock axis (the admin's local day),
+ * one compact row per member. Concurrency across people is real (absolute time);
+ * labels are rendered in the admin's timezone.
+ */
+export async function buildTeamDay(adminUserId: string, dateArg?: string): Promise<TeamDay> {
+  const now = Date.now();
+  const admin = await prisma.user.findUniqueOrThrow({ where: { id: adminUserId } });
+  const tz = resolveTz(admin.timezone);
+  const date = dateArg || localToday(tz);
+  const { start: dayStart, end: dayEnd } = localDayRange(date, tz);
+  const startMs = dayStart.getTime();
+  const endMs = dayEnd.getTime();
+
+  const users = await prisma.user.findMany({ where: { deletedAt: null }, orderBy: { githubLogin: 'asc' } });
+  const members: TeamDayMember[] = [];
+  for (const u of users) {
+    const sessions = await prisma.session.findMany({
+      where: {
+        userId: u.id,
+        deletedAt: null,
+        startedAt: { lt: dayEnd },
+        OR: [{ endedAt: null }, { endedAt: { gt: dayStart } }],
+      },
+      include: { segments: true, task: { select: { title: true, displayTitle: true } } },
+      orderBy: { startedAt: 'asc' },
+    });
+    const intervals: Interval[] = sessions.map((s) =>
+      clip({ start: s.startedAt.getTime(), end: (s.endedAt ?? new Date(now)).getTime() }, startMs, endMs),
+    );
+    const openFlagCount = await prisma.flag.count({ where: { userId: u.id, status: 'open' } });
+    members.push({
+      userId: u.id,
+      githubLogin: u.githubLogin,
+      name: u.name,
+      avatarUrl: u.avatarUrl,
+      activeElapsedMinutes: unionMinutes(intervals),
+      sessionCount: sessions.length,
+      openFlagCount,
+      runningTitles: sessions
+        .filter((s) => s.isOpen)
+        .map((s) => s.task?.displayTitle ?? s.task?.title ?? s.offTaskLabel ?? 'off-task'),
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        startedAt: s.startedAt.toISOString(),
+        endedAt: s.endedAt ? s.endedAt.toISOString() : null,
+        isOpen: s.isOpen,
+        title: s.task?.displayTitle ?? s.task?.title ?? s.offTaskLabel ?? 'off-task',
+        segments: s.segments.map((seg) => ({
+          type: seg.type,
+          source: seg.source,
+          startedAt: seg.startedAt.toISOString(),
+          endedAt: seg.endedAt.toISOString(),
+        })),
+      })),
+    });
+  }
+
+  return {
+    date,
+    timezone: tz,
+    dayStart: dayStart.toISOString(),
+    dayEnd: dayEnd.toISOString(),
     members,
   };
 }

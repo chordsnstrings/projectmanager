@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { canViewUser, requireAdmin, requireUser } from '../auth/require';
-import { buildDayTimeline, buildTeamDashboard, buildTrends } from '../services/dashboard';
+import { buildDayTimeline, buildTeamDashboard, buildTeamDay, buildTrends } from '../services/dashboard';
 import { mailConfigured, verifyMail } from '../email/mailer';
 import { sendAdminDigest, sendDevDigests } from '../scripts/digest';
 
@@ -23,6 +23,13 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       return buildTeamDashboard(start, end);
     },
   );
+
+  // Whole-team day on a shared axis (admin only).
+  app.get<{ Querystring: { date?: string } }>('/dashboard/team/day', async (req, reply) => {
+    const admin = await requireAdmin(req, reply);
+    if (!admin) return;
+    return buildTeamDay(admin.id, req.query.date);
+  });
 
   // Per-person day timeline (admin or self).
   app.get<{ Params: { id: string }; Querystring: { date?: string } }>(

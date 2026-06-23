@@ -11,6 +11,7 @@ import type {
   SessionDTO,
   TaskDTO,
   TeamDashboard,
+  TeamDay as TeamDayDTO,
   Trends as TrendsDTO,
 } from '@cadence/shared';
 import { api, ApiError } from './lib/api';
@@ -19,6 +20,7 @@ import { downloadTeamCsv } from './lib/csv';
 import { Logo } from './components/Logo';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
+import TeamDay from './admin/TeamDay';
 import DayTimeline from './admin/DayTimeline';
 import Trends from './admin/Trends';
 import FlagsPanel from './admin/FlagsPanel';
@@ -389,10 +391,12 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     : path.startsWith('/admin/questions')
       ? 'questions'
       : 'team';
+  const teamView: 'roster' | 'day' = path.startsWith('/admin/team/day') ? 'day' : 'roster';
   const date = params.get('date') ?? todayStr();
   const isToday = date === todayStr();
 
   const [team, setTeam] = useState<TeamDashboard | null>(null);
+  const [teamDay, setTeamDay] = useState<TeamDayDTO | null>(null);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
   const [trends, setTrends] = useState<TrendsDTO | null>(null);
   const [flags, setFlags] = useState<FlagDTO[]>([]);
@@ -428,6 +432,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       api<DayTimelineDTO>(`/dashboard/user/${userId}/day?date=${date}`).then(setDay).catch(() => setDay(null)),
     [date],
   );
+  const loadTeamDay = useCallback(
+    () => api<TeamDayDTO>(`/dashboard/team/day?date=${date}`).then(setTeamDay).catch(() => setTeamDay(null)),
+    [date],
+  );
   const loadTrends = useCallback(
     (userId: string) =>
       api<TrendsDTO>(`/dashboard/user/${userId}/trends`).then(setTrends).catch(() => setTrends(null)),
@@ -440,6 +448,14 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     const id = setInterval(loadTeam, 30000);
     return () => clearInterval(id);
   }, [loadTeam, isToday]);
+
+  useEffect(() => {
+    if (selectedUser || tab !== 'team' || teamView !== 'day') return;
+    void loadTeamDay();
+    if (!isToday) return;
+    const id = setInterval(loadTeamDay, 30000);
+    return () => clearInterval(id);
+  }, [selectedUser, tab, teamView, loadTeamDay, isToday]);
 
   useEffect(() => {
     if (tab === 'flags') void loadFlags();
@@ -598,6 +614,20 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
         ) : (
           <div className="animate-fade-in">
             <div className="mb-5 flex items-center gap-2 flex-wrap">
+              <div className="inline-flex rounded-lg border border-hair overflow-hidden">
+                <button
+                  onClick={() => navigate(`/admin/team${date === todayStr() ? '' : `?date=${date}`}`)}
+                  className={`font-mono text-xs px-3.5 h-8 transition-colors ${teamView === 'roster' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
+                >
+                  roster
+                </button>
+                <button
+                  onClick={() => navigate(`/admin/team/day${date === todayStr() ? '' : `?date=${date}`}`)}
+                  className={`font-mono text-xs px-3.5 h-8 border-l border-hair transition-colors ${teamView === 'day' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
+                >
+                  day
+                </button>
+              </div>
               <DateNav date={date} setDate={setDate} />
               <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
                 <SendDigestButton />
@@ -608,7 +638,13 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                 )}
               </div>
             </div>
-            {!loaded ? (
+            {teamView === 'day' ? (
+              teamDay ? (
+                <TeamDay data={teamDay} onSelectUser={selectUser} />
+              ) : (
+                <Loading>loading team day…</Loading>
+              )
+            ) : !loaded ? (
               <Loading>loading team…</Loading>
             ) : team ? (
               <TeamOverview data={team} onSelectUser={selectUser} />
