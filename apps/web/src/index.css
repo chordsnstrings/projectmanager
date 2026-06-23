@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,100 +15,127 @@ body,
 
 body {
   margin: 0;
-  background: #15171c;
-  color: #e8eaed;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #edeff3;
+  background-color: #0b0c10;
+  background-image: radial-gradient(1100px 620px at 80% -10%, rgba(216, 182, 124, 0.07), transparent 60%),
+    radial-gradient(900px 520px at 8% -4%, rgba(90, 166, 240, 0.06), transparent 55%);
+  background-attachment: fixed;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01';
 }
 
-/* Keyboard focus ring (P6) — visible only for keyboard nav, brass accent. */
+/* Keyboard focus ring — brass, only for keyboard nav. */
 :focus-visible {
-  outline: 2px solid #c8a96a;
+  outline: 2px solid rgba(216, 182, 124, 0.7);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
-/* Calmer, thinner scrollbars to match the instrument aesthetic. */
+/* Thin, calm scrollbars. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 *::-webkit-scrollbar {
   height: 8px;
   width: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.18);
 }
 
-/* ── Reusable component layer ──────────────────────────────────────────────
-   A small, consistent system: surfaces (.card), buttons (.btn-*), chips,
-   labels. Used across programmer + admin screens for one coherent look. */
+/* ── Component layer — one cohesive, modern vocabulary ─────────────────────── */
 @layer components {
-  /* Elevated surface — hairline ring, soft corners, flat (no shadow). */
+  /* Elevated surface: soft ring + gentle shadow + rounded. */
   .card {
-    @apply rounded-xl border border-hair bg-panel;
+    @apply rounded-2xl bg-panel ring-1 ring-white/[0.06] shadow-card;
+  }
+  /* Interactive surface: subtle hover lift. */
+  .card-i {
+    @apply card transition-[transform,background-color,box-shadow] duration-200 ease-smooth
+           hover:-translate-y-[1px] hover:bg-surface/60;
   }
 
-  /* Section label — small, uppercase, tracked mono "instrument" caption. */
+  /* Captions: small, quiet. Use mono only where it's data. */
   .label {
-    @apply font-mono text-[10px] uppercase tracking-[0.12em] text-text3;
+    @apply text-[11px] font-medium text-text3 tracking-tight2;
+  }
+  .cap {
+    @apply font-mono text-[10px] uppercase tracking-[0.14em] text-text3;
   }
 
-  /* Button base: tactile, ≥36px target, smooth color transition. */
+  /* Buttons — tactile, with a press micro-interaction. */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg
-           border font-mono text-xs leading-none
-           transition-colors duration-150 select-none
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border font-medium
+           leading-none select-none transition-all duration-150 ease-smooth
+           active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-sm {
-    @apply h-8 px-2.5;
+    @apply h-8 px-3 text-xs;
   }
   .btn-md {
-    @apply h-9 px-3;
+    @apply h-9 px-3.5 text-[13px];
   }
   .btn-lg {
-    @apply h-10 px-4;
+    @apply h-11 px-5 text-sm;
   }
-  /* Neutral, recessive control. */
   .btn-ghost {
-    @apply border-hair text-text2 hover:text-text hover:bg-surface2/70 hover:border-hair2;
+    @apply border-white/[0.08] bg-white/[0.02] text-text2 hover:text-text hover:bg-white/[0.05] hover:border-white/[0.14];
   }
-  /* Quiet control that reads as tertiary until hovered. */
   .btn-quiet {
-    @apply border-transparent text-text3 hover:text-text hover:bg-surface2/60;
+    @apply border-transparent text-text3 hover:text-text hover:bg-white/[0.05];
   }
-  /* The hero: primary action — brass, sparing. */
   .btn-primary {
-    @apply border-transparent bg-brass text-bg font-medium hover:bg-brass/90 active:bg-brass/80;
+    @apply border-transparent bg-brass text-[#1a140a] font-semibold
+           hover:bg-brass/90 hover:shadow-glow-brass active:bg-brass/80;
   }
-  /* Pill chip — non-git labels, filters. */
+  .btn-danger {
+    @apply border-danger/30 bg-danger/10 text-danger hover:bg-danger/15 hover:border-danger/50;
+  }
+
+  /* Pill chip. */
   .chip {
-    @apply inline-flex items-center justify-center h-8 px-3 rounded-full
-           border border-hair font-mono text-xs text-text2
-           transition-colors duration-150
-           hover:text-text hover:border-hair2 hover:bg-surface2/60;
+    @apply inline-flex items-center justify-center h-8 px-3.5 rounded-full
+           border border-white/[0.08] bg-white/[0.02] text-xs font-medium text-text2
+           transition-all duration-150 ease-smooth active:scale-[0.97]
+           hover:text-text hover:bg-white/[0.06] hover:border-white/[0.14];
   }
-  /* Small status/meta tag. */
+  /* Status / meta tag. */
   .tag {
-    @apply inline-flex items-center rounded-md border px-1.5 py-0.5
-           font-mono text-[10px] uppercase tracking-[0.08em];
+    @apply inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium;
   }
-  /* Form field — inputs / selects. */
+  /* Inputs / selects. */
   .field {
-    @apply rounded-lg border border-hair bg-surface text-text
+    @apply rounded-xl border border-white/[0.08] bg-surface text-text
            placeholder:text-text3 transition-colors duration-150
-           focus:outline-none focus:border-brass/50;
+           focus:outline-none focus:border-brass/55 focus:ring-2 focus:ring-brass/15;
+  }
+
+  /* Loading shimmer. */
+  .shimmer {
+    @apply relative overflow-hidden bg-surface/60;
+  }
+  .shimmer::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
   }
 }
 
-/* Honour reduced-motion preferences (§12 P6, wired early). */
+/* Honour reduced-motion. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -115,5 +143,6 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

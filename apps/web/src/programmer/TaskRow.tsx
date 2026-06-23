@@ -76,11 +76,34 @@ function Origin({ task }: { task: TaskDTO }) {
   return <span className="font-mono text-activity-coding/80">{task.origin}</span>;
 }
 
+const STATUS_DOT: Record<TaskStatus, string> = {
+  todo: '#6a7080',
+  in_progress: '#2bd4a0',
+  in_review: '#5aa6f0',
+  done: '#5cc28d',
+};
+
 function StatusBadge({ status }: { status: TaskStatus }) {
   return (
-    <span className={`tag ${STATUS_TONE[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-[3px] text-[11px] font-medium ${STATUS_TONE[status]}`}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_DOT[status] }} aria-hidden />
       {STATUS_LABEL[status]}
     </span>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86A1 1 0 0 0 8 5.14Z" />
+    </svg>
+  );
+}
+function StopIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <rect x="6" y="6" width="12" height="12" rx="2.5" />
+    </svg>
   );
 }
 
@@ -110,31 +133,31 @@ export default function TaskRow({
 
   return (
     <div
-      className={`border-b border-hair last:border-b-0 transition-colors ${
-        running ? 'bg-surface/50' : 'hover:bg-surface/25'
+      className={`group relative border-b border-white/[0.05] last:border-b-0 transition-colors duration-200 ${
+        running ? 'bg-white/[0.035]' : 'hover:bg-white/[0.025]'
       }`}
-      style={edgeStyle}
     >
-      <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-        {/* Left: origin + title + meta */}
+      {/* signature activity edge — a soft glowing bar on running rows */}
+      {running && (
+        <span
+          className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full"
+          style={{ background: activityColor(activity), boxShadow: `0 0 14px ${activityColor(activity)}55` }}
+          aria-hidden
+        />
+      )}
+      <div className="flex items-center gap-4 px-4 sm:px-5 py-4">
+        {/* Left: title + meta */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
+          <TitleEditor task={task} onRename={onRename} />
+          <div className="mt-1.5 flex items-center gap-2.5 flex-wrap text-[11px] text-text3">
             <Origin task={task} />
-            <TitleEditor task={task} onRename={onRename} />
-          </div>
-          <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[11px]">
-            <span className="font-mono text-text3 px-1.5 py-0.5 rounded-md border border-hair bg-surface/40">
-              {task.repoFullName}
-            </span>
+            <span className="opacity-30">·</span>
+            <span className="font-mono">{task.repoFullName}</span>
             <StatusBadge status={task.status} />
             {task.estimateMinutes != null && (
-              <span className="font-mono text-text3">
-                est {fmtDuration(task.estimateMinutes)}
-              </span>
+              <span className="font-mono">est {fmtDuration(task.estimateMinutes)}</span>
             )}
-            {task.reopenCount > 0 && (
-              <span className="font-mono text-danger/80">↻ {task.reopenCount}</span>
-            )}
+            {task.reopenCount > 0 && <span className="font-mono text-danger/80">↻ {task.reopenCount}</span>}
           </div>
         </div>
 
@@ -145,23 +168,23 @@ export default function TaskRow({
               <button
                 type="button"
                 onClick={() => onOverrideActivity(session.id, nextActivity(activity))}
-                className="inline-flex items-center justify-center w-9 h-9 -mx-1 text-text2 hover:text-text"
-                title={`activity: ${activity ?? 'idle'} (tap to override)`}
-                aria-label="override activity"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-full transition-transform active:scale-90 hover:bg-white/[0.05]"
+                title={`activity: ${activity ?? 'idle'} (tap to change)`}
+                aria-label="change activity"
               >
-                <ActivityDot activity={activity} size={10} />
+                <ActivityDot activity={activity} size={11} />
               </button>
-              <span className="text-sm text-text tabular-nums font-mono" aria-label="elapsed">
+              <span className="font-mono text-[15px] tabular-nums text-brass font-medium" aria-label="elapsed">
                 <LiveTimer startedAt={session.startedAt} />
               </span>
               <button
                 type="button"
                 onClick={() => onStop(session.id)}
-                className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-danger/40 text-danger hover:bg-danger/15 hover:border-danger/60 transition-colors"
+                className="w-10 h-10 grid place-items-center rounded-full border border-danger/40 text-danger transition-all duration-150 ease-smooth hover:bg-danger/15 hover:border-danger/60 active:scale-90"
                 title="stop session"
                 aria-label="stop session"
               >
-                <span className="text-xs leading-none">■</span>
+                <StopIcon />
               </button>
             </>
           )}
@@ -169,11 +192,11 @@ export default function TaskRow({
             <button
               type="button"
               onClick={() => onStart(task.id)}
-              className="btn btn-md btn-ghost hover:border-brass/40 hover:text-brass"
+              className="w-10 h-10 grid place-items-center rounded-full border border-white/[0.1] text-text2 pl-0.5 transition-all duration-150 ease-smooth hover:bg-brass hover:text-[#1a140a] hover:border-brass hover:shadow-glow-brass active:scale-90"
               title="start session"
+              aria-label="start session"
             >
-              <span className="text-[10px] leading-none">▶</span>
-              <span>start</span>
+              <PlayIcon />
             </button>
           )}
           {wrapping && (
@@ -232,8 +255,8 @@ function TitleEditor({
     );
   }
   return (
-    <span className="group inline-flex items-center gap-1 min-w-0">
-      <span className="text-sm text-text font-medium truncate tracking-tightish">{task.title}</span>
+    <span className="group/title inline-flex items-center gap-1 min-w-0 max-w-full">
+      <span className="text-[15px] text-text font-medium truncate tracking-tightish">{task.title}</span>
       <button
         type="button"
         onClick={() => {
