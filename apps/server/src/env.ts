@@ -26,6 +26,20 @@ export const env = {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
 
+  // Email digests (SMTP). Port 465 ⇒ implicit TLS (secure=true); 587 ⇒ STARTTLS.
+  SMTP_HOST: process.env.SMTP_HOST ?? '',
+  SMTP_PORT: num('SMTP_PORT', 465),
+  SMTP_SECURE: (process.env.SMTP_SECURE ?? (num('SMTP_PORT', 465) === 465 ? 'true' : 'false')) !== 'false',
+  SMTP_USER: process.env.SMTP_USER ?? '',
+  SMTP_PASS: process.env.SMTP_PASS ?? '',
+  MAIL_FROM: process.env.MAIL_FROM ?? '',
+  // Extra fixed recipients for the admin digest (comma-separated), beyond every
+  // admin with an email on file. Useful when a GitHub email is private.
+  DIGEST_TO: (process.env.DIGEST_TO ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
   // Tunables (§6/§11)
   IDLE_MINUTES: num('IDLE_MINUTES', 90),
   MAX_OPEN_HOURS: num('MAX_OPEN_HOURS', 8),

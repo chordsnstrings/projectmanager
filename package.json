@@ -22,6 +22,7 @@
     "migrate:deploy": "npm run migrate:deploy -w @cadence/db",
     "migrate:dev": "npm run migrate:dev -w @cadence/db",
     "reconcile": "node apps/server/dist/scripts/reconcile.js",
+    "digest": "node apps/server/dist/scripts/digest.js",
     "backfill": "node apps/server/dist/scripts/backfill.js",
     "seed-admin": "node apps/server/dist/scripts/seed-admin.js",
     "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @cadence/server\" \"npm run dev -w @cadence/web\"",

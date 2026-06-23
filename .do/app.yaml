@@ -42,6 +42,13 @@ services:
       - { key: GITHUB_CLIENT_ID, scope: RUN_AND_BUILD_TIME, type: SECRET }
       - { key: GITHUB_CLIENT_SECRET, scope: RUN_TIME, type: SECRET }
       - { key: GITHUB_WEBHOOK_SECRET, scope: RUN_TIME, type: SECRET }
+      # Email digests (SMTP). Values set in the DO Control Panel / via API.
+      - { key: SMTP_HOST, scope: RUN_TIME }
+      - { key: SMTP_PORT, scope: RUN_TIME }
+      - { key: SMTP_USER, scope: RUN_TIME, type: SECRET }
+      - { key: SMTP_PASS, scope: RUN_TIME, type: SECRET }
+      - { key: MAIL_FROM, scope: RUN_TIME }
+      - { key: DIGEST_TO, scope: RUN_TIME }
 jobs:
   - name: migrate
     kind: PRE_DEPLOY
@@ -71,6 +78,28 @@ jobs:
     instance_size_slug: apps-s-1vcpu-0.5gb
     envs:
       - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
+  - name: digest
+    kind: SCHEDULED
+    schedule:
+      cron: "0 6 * * *" # daily 06:00 UTC team digest + per-dev nudges
+    github:
+      repo: chordsnstrings/projectmanager
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    environment_slug: node-js
+    build_command: npm ci && npm run build
+    run_command: npm run digest
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    envs:
+      - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
+      - { key: APP_BASE_URL, scope: RUN_TIME }
+      - { key: SMTP_HOST, scope: RUN_TIME }
+      - { key: SMTP_PORT, scope: RUN_TIME }
+      - { key: SMTP_USER, scope: RUN_TIME, type: SECRET }
+      - { key: SMTP_PASS, scope: RUN_TIME, type: SECRET }
+      - { key: MAIL_FROM, scope: RUN_TIME }
+      - { key: DIGEST_TO, scope: RUN_TIME }
 databases:
   - name: db
     engine: PG

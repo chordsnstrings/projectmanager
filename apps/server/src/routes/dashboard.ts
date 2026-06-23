@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { canViewUser, requireAdmin, requireUser } from '../auth/require';
 import { buildDayTimeline, buildTeamDashboard, buildTrends } from '../services/dashboard';
+import { mailConfigured, verifyMail } from '../email/mailer';
+import { sendAdminDigest, sendDevDigests } from '../scripts/digest';
 
 function parseRange(q: { from?: string; to?: string }): { start: Date; end: Date } {
   const end = q.to ? new Date(q.to) : new Date();
@@ -45,4 +47,18 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       return buildTrends(req.params.id, weeks);
     },
   );
+
+  // Send the digest emails now (admin only) — for verifying SMTP + previewing
+  // what recipients receive. ?devs=1 also fires the per-dev nudges.
+  app.post<{ Querystring: { devs?: string } }>('/dashboard/send-digest', async (req, reply) => {
+    const admin = await requireAdmin(req, reply);
+    if (!admin) return;
+    if (!mailConfigured()) {
+      return reply.code(503).send({ error: 'smtp_not_configured' });
+    }
+    const verified = await verifyMail();
+    const adminRecipients = await sendAdminDigest();
+    const devsSent = req.query.devs === '1' ? await sendDevDigests() : 0;
+    return { verified, adminRecipients, devsSent };
+  });
 }
