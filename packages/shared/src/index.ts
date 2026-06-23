@@ -239,6 +239,61 @@ export interface TeamDayMember {
   sessions: TeamDaySession[];
 }
 
+// ── Productivity / progress / completion / versions ─────────────────────────
+export interface ProductivityWindow {
+  activeMinutes: number;
+  taskHoursMinutes: number;
+  sessions: number;
+  completed: number;
+}
+export interface Productivity {
+  timezone: string;
+  today: ProductivityWindow;
+  week: ProductivityWindow; // last 7 local days incl. today
+}
+
+export interface ProgressPoint {
+  weekStart: string;
+  completed: number;
+  activeMinutes: number;
+  taskHoursMinutes: number;
+}
+export interface MilestoneRollup {
+  title: string;
+  dueOn: string | null;
+  total: number;
+  done: number;
+  pct: number; // 0..100
+}
+export interface VersionRollup {
+  repoFullName: string;
+  version: string;
+  at: string | null;
+}
+export interface Progress {
+  userId: string;
+  githubLogin: string;
+  totalCompleted: number;
+  openCount: number;
+  inReviewCount: number;
+  completionRate: number; // done / (done+open), 0..1
+  points: ProgressPoint[];
+  milestones: MilestoneRollup[];
+  versions: VersionRollup[];
+}
+
+export interface CompletionItem {
+  taskId: string;
+  title: string;
+  repoFullName: string;
+  origin: string;
+  status: TaskStatus;
+  milestoneTitle: string | null;
+  estimateMinutes: number | null;
+  actualMinutes: number;
+  closedAt: string | null;
+}
+
 /** One day across the whole team — one row per member on a shared time axis. */
 export interface TeamDay {
   date: string; // YYYY-MM-DD (the admin's local day)

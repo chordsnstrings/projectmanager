@@ -13,6 +13,8 @@ import type {
   TeamDashboard,
   TeamDay as TeamDayDTO,
   Trends as TrendsDTO,
+  Progress as ProgressDTO,
+  Productivity as ProductivityDTO,
 } from '@cadence/shared';
 import { api, ApiError } from './lib/api';
 import { relativeTime } from './lib/format';
@@ -23,6 +25,8 @@ import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
 import DayTimeline from './admin/DayTimeline';
 import Trends from './admin/Trends';
+import ProgressView from './admin/ProgressView';
+import CompletionLog from './admin/CompletionLog';
 import FlagsPanel from './admin/FlagsPanel';
 import AskAboutTask from './admin/AskAboutTask';
 import SendDigestButton from './admin/SendDigestButton';
@@ -145,7 +149,11 @@ function SignIn() {
 // ── Programmer ────────────────────────────────────────────────────────────────
 function DevApp({ me, route }: { me: Me; route: Route }) {
   const { path, params, navigate } = route;
-  const view: 'board' | 'day' = path.startsWith('/board/day') ? 'day' : 'board';
+  const view: 'board' | 'day' | 'progress' = path.startsWith('/board/day')
+    ? 'day'
+    : path.startsWith('/board/progress')
+      ? 'progress'
+      : 'board';
   const dayDate = params.get('date') ?? todayStr();
   const setDayDate: React.Dispatch<React.SetStateAction<string>> = (upd) => {
     const next = typeof upd === 'function' ? (upd as (d: string) => string)(dayDate) : upd;
@@ -158,22 +166,26 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
+  const [productivity, setProductivity] = useState<ProductivityDTO | null>(null);
+  const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, a, n, q] = await Promise.all([
+    const [t, a, n, q, prod] = await Promise.all([
       api<Paginated<TaskDTO>>('/tasks').then((p) => p.items).catch(() => [] as TaskDTO[]),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
       api<QuestionDTO[]>('/questions?status=open').catch(() => [] as QuestionDTO[]),
+      api<ProductivityDTO>('/me/productivity').catch(() => null),
     ]);
     setTasks(t);
     setActive(a);
     setNudges(n);
     setQuestions(q);
+    setProductivity(prod);
     setLoaded(true);
   }, []);
 
@@ -216,6 +228,11 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     const id = setInterval(loadDay, 30000); // keep today's view current
     return () => clearInterval(id);
   }, [view, loadDay, dayDate]);
+
+  useEffect(() => {
+    if (view !== 'progress') return;
+    void api<ProgressDTO>(`/dashboard/user/${me.id}/progress`).then(setProgress).catch(() => setProgress(null));
+  }, [view, me.id]);
 
   // Live "stop on commit": while a task session is running, poll just that repo
   // for new commits (no webhooks needed) and auto-stop within ~30s.
@@ -350,8 +367,16 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   if (!loaded) return <Splash>loading your board…</Splash>;
 
-  // "My day" — read-only self-review timeline.
-  if (view === 'day') {
+  // Self-review screens: "My day" timeline + "Progress".
+  if (view === 'day' || view === 'progress') {
+    const subTab = (to: string, key: string, label: string) => (
+      <button
+        onClick={() => navigate(to)}
+        className={`font-mono text-xs px-3.5 h-8 transition-colors ${view === key ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'} ${key !== 'day' ? 'border-l border-hair' : ''}`}
+      >
+        {label}
+      </button>
+    );
     return (
       <Shell>
         <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
@@ -363,18 +388,30 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         </header>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-sm font-semibold text-text tracking-tightish mr-1">My day</h1>
-            <DateNav date={dayDate} setDate={setDayDate} />
+            <div className="inline-flex rounded-lg border border-hair overflow-hidden">
+              {subTab('/board/day', 'day', 'My day')}
+              {subTab('/board/progress', 'progress', 'Progress')}
+            </div>
+            {view === 'day' && <DateNav date={dayDate} setDate={setDayDate} />}
           </div>
-          {day ? (
+          {view === 'day' ? (
+            day ? (
+              <>
+                <DayTimeline data={day} />
+                <p className="text-center font-mono text-[11px] text-text3">
+                  active = real time worked (overlaps counted once) · task hrs = effort across tasks
+                </p>
+              </>
+            ) : (
+              <Loading>loading your day…</Loading>
+            )
+          ) : progress ? (
             <>
-              <DayTimeline data={day} />
-              <p className="text-center font-mono text-[11px] text-text3">
-                active = real time worked (overlaps counted once) · task hrs = effort across tasks
-              </p>
+              <ProgressView data={progress} />
+              <CompletionLog />
             </>
           ) : (
-            <Loading>loading your day…</Loading>
+            <Loading>loading your progress…</Loading>
           )}
         </div>
       </Shell>
@@ -391,6 +428,8 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     <Shell>
       <ProgrammerScreen
         onOpenDay={() => navigate('/board/day')}
+        onOpenProgress={() => navigate('/board/progress')}
+        productivity={productivity}
         login={me.githubLogin}
         syncedAgo={syncedAgo}
         syncing={syncing}
@@ -438,9 +477,12 @@ type AdminTab = 'team' | 'flags' | 'questions';
 function AdminApp({ me, route }: { me: Me; route: Route }) {
   const { path, params, navigate } = route;
   // Navigation state is derived from the slug.
-  const personMatch = path.match(/^\/admin\/u\/([^/]+)\/(day|trends)$/);
+  const personMatch = path.match(/^\/admin\/u\/([^/]+)\/(day|trends|progress)$/);
   const selectedUser = personMatch ? personMatch[1]! : null;
-  const personView: 'day' | 'trends' = personMatch && personMatch[2] === 'trends' ? 'trends' : 'day';
+  const personView: 'day' | 'trends' | 'progress' =
+    personMatch && (personMatch[2] === 'trends' || personMatch[2] === 'progress')
+      ? (personMatch[2] as 'trends' | 'progress')
+      : 'day';
   const tab: AdminTab = path.startsWith('/admin/flags')
     ? 'flags'
     : path.startsWith('/admin/questions')
@@ -454,6 +496,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const [teamDay, setTeamDay] = useState<TeamDayDTO | null>(null);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
   const [trends, setTrends] = useState<TrendsDTO | null>(null);
+  const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [flags, setFlags] = useState<FlagDTO[]>([]);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -496,6 +539,11 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       api<TrendsDTO>(`/dashboard/user/${userId}/trends`).then(setTrends).catch(() => setTrends(null)),
     [],
   );
+  const loadProgress = useCallback(
+    (userId: string) =>
+      api<ProgressDTO>(`/dashboard/user/${userId}/progress`).then(setProgress).catch(() => setProgress(null)),
+    [],
+  );
 
   useEffect(() => {
     void loadTeam();
@@ -520,8 +568,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   useEffect(() => {
     if (!selectedUser) return;
     if (personView === 'trends') void loadTrends(selectedUser);
+    else if (personView === 'progress') void loadProgress(selectedUser);
     else void loadDay(selectedUser);
-  }, [selectedUser, personView, date, loadDay, loadTrends]);
+  }, [selectedUser, personView, date, loadDay, loadTrends, loadProgress]);
 
   const selectUser = useCallback((userId: string) => navigate(`/admin/u/${userId}/day`), [navigate]);
 
@@ -628,6 +677,12 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                   day
                 </button>
                 <button
+                  onClick={() => navigate(`/admin/u/${selectedUser}/progress`)}
+                  className={`font-mono text-xs px-3.5 h-8 border-l border-hair transition-colors ${personView === 'progress' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
+                >
+                  progress
+                </button>
+                <button
                   onClick={() => navigate(`/admin/u/${selectedUser}/trends`)}
                   className={`font-mono text-xs px-3.5 h-8 border-l border-hair transition-colors ${personView === 'trends' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
                 >
@@ -659,6 +714,15 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                 <DayTimeline data={day} onAskQuestion={onAskQuestion} />
               ) : (
                 <Loading>loading day…</Loading>
+              )
+            ) : personView === 'progress' ? (
+              progress ? (
+                <div className="flex flex-col gap-5">
+                  <ProgressView data={progress} />
+                  <CompletionLog userId={selectedUser} />
+                </div>
+              ) : (
+                <Loading>loading progress…</Loading>
               )
             ) : trends ? (
               <Trends data={trends} />

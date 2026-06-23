@@ -262,4 +262,32 @@ describe('authed API integration', () => {
     expect(typeof devEntry.hasOpenSession).toBe('boolean');
     expect(devEntry.timezone).toBeTruthy();
   });
+
+  it('exposes productivity (self), progress (self/admin) and the completion log', async () => {
+    if (!available) return;
+    const prod = await app.inject({ method: 'GET', url: '/me/productivity', headers: { cookie: devCookie } });
+    expect(prod.statusCode).toBe(200);
+    const pb = prod.json();
+    expect(pb.today).toBeTruthy();
+    expect(pb.week).toBeTruthy();
+    expect(typeof pb.today.activeMinutes).toBe('number');
+
+    // dev sees own progress; admin may view the dev's
+    const own = await app.inject({ method: 'GET', url: `/dashboard/user/${devId}/progress`, headers: { cookie: devCookie } });
+    expect(own.statusCode).toBe(200);
+    expect(Array.isArray(own.json().points)).toBe(true);
+    expect(Array.isArray(own.json().milestones)).toBe(true);
+    expect(Array.isArray(own.json().versions)).toBe(true);
+
+    const asAdmin = await app.inject({ method: 'GET', url: `/dashboard/user/${devId}/progress`, headers: { cookie: adminCookie } });
+    expect(asAdmin.statusCode).toBe(200);
+
+    // a dev cannot view another user's progress
+    const forbidden = await app.inject({ method: 'GET', url: `/dashboard/user/${adminId}/progress`, headers: { cookie: devCookie } });
+    expect(forbidden.statusCode).toBe(403);
+
+    const comp = await app.inject({ method: 'GET', url: '/completions', headers: { cookie: devCookie } });
+    expect(comp.statusCode).toBe(200);
+    expect(Array.isArray(comp.json().items)).toBe(true);
+  });
 });

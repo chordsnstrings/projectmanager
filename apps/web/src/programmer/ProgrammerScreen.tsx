@@ -4,10 +4,12 @@ import type {
   CommitDTO,
   DraftSummary,
   NudgeDTO,
+  Productivity,
   QuestionDTO,
   SessionDTO,
   TaskDTO,
 } from '@cadence/shared';
+import { fmtDuration } from '../lib/format';
 import TaskRow, { type TaskRowState } from './TaskRow';
 import { Logo } from '../components/Logo';
 import { liveElapsed } from '../lib/format';
@@ -58,6 +60,10 @@ export interface ProgrammerScreenProps {
   onToggleStopOnCommit?: () => void;
   /** open the dev's own day-timeline (self-review) */
   onOpenDay?: () => void;
+  /** open the dev's own progress / completion view */
+  onOpenProgress?: () => void;
+  /** today + this-week productivity summary for the board strip */
+  productivity?: Productivity | null;
 }
 
 function RunningTimer({ startedAt }: { startedAt: string }) {
@@ -70,6 +76,15 @@ function RunningTimer({ startedAt }: { startedAt: string }) {
 }
 
 const noop = () => {};
+
+function ProdStat({ label, value, tone = 'text-text' }: { label: string; value: string; tone?: string }) {
+  return (
+    <div>
+      <div className="label">{label}</div>
+      <div className={`font-mono text-base mt-0.5 ${tone}`}>{value}</div>
+    </div>
+  );
+}
 
 export default function ProgrammerScreen({
   login,
@@ -98,6 +113,8 @@ export default function ProgrammerScreen({
   stopOnCommit = false,
   onToggleStopOnCommit = noop,
   onOpenDay = noop,
+  onOpenProgress = noop,
+  productivity = null,
 }: ProgrammerScreenProps) {
   return (
     <div className="min-h-full text-text font-sans">
@@ -110,6 +127,9 @@ export default function ProgrammerScreen({
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button type="button" onClick={() => onOpenDay()} className="btn btn-sm btn-ghost" title="review your day timeline">
             My day
+          </button>
+          <button type="button" onClick={() => onOpenProgress()} className="btn btn-sm btn-ghost" title="your progress & completed work">
+            Progress
           </button>
           <span className="inline-flex items-center gap-1.5 font-mono text-xs text-text2 px-2.5 h-8 rounded-lg border border-hair">
             <span className="w-1.5 h-1.5 rounded-full bg-success" aria-hidden />
@@ -136,6 +156,21 @@ export default function ProgrammerScreen({
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-7 sm:py-8 flex flex-col gap-5">
+        {/* Productivity strip — your actual output today + this week */}
+        {productivity && (
+          <button
+            type="button"
+            onClick={() => onOpenProgress()}
+            className="card px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-left hover:bg-surface/40 transition-colors"
+            title="open your progress"
+          >
+            <ProdStat label="today · active" value={fmtDuration(productivity.today.activeMinutes)} />
+            <ProdStat label="today · done" value={String(productivity.today.completed)} tone="text-success" />
+            <ProdStat label="7d · active" value={fmtDuration(productivity.week.activeMinutes)} />
+            <ProdStat label="7d · done" value={String(productivity.week.completed)} tone="text-success" />
+          </button>
+        )}
+
         {/* Open questions the dev must answer (gates next completion) */}
         <QuestionsForDev questions={questions} onAnswer={onAnswerQuestion} />
 

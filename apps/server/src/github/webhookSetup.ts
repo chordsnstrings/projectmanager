@@ -9,7 +9,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const GH_API = 'https://api.github.com';
 
-const HOOK_EVENTS = ['push', 'pull_request', 'pull_request_review', 'issues'];
+const HOOK_EVENTS = ['push', 'pull_request', 'pull_request_review', 'issues', 'release'];
 
 function headers(token: string): Record<string, string> {
   return {

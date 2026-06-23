@@ -93,6 +93,8 @@ export async function upsertTask(
     estimateMinutes?: number | null;
     closedAt?: Date | null;
     bumpReopen?: boolean;
+    milestoneTitle?: string | null;
+    milestoneDueOn?: Date | null;
   },
 ): Promise<string> {
   const existing = await db.task.findFirst({
@@ -116,6 +118,8 @@ export async function upsertTask(
         assigneeUserId: data.assigneeUserId ?? null,
         estimateMinutes: data.estimateMinutes ?? null,
         closedAt: data.closedAt ?? null,
+        milestoneTitle: data.milestoneTitle ?? null,
+        milestoneDueOn: data.milestoneDueOn ?? null,
       },
     });
     return created.id;
@@ -133,12 +137,26 @@ export async function upsertTask(
       status: data.status,
       ...(data.assigneeUserId !== undefined ? { assigneeUserId: data.assigneeUserId } : {}),
       ...(data.estimateMinutes !== undefined ? { estimateMinutes: data.estimateMinutes } : {}),
+      ...(data.milestoneTitle !== undefined ? { milestoneTitle: data.milestoneTitle } : {}),
+      ...(data.milestoneDueOn !== undefined ? { milestoneDueOn: data.milestoneDueOn } : {}),
       closedAt: data.closedAt ?? null,
       ...(reopening ? { reopenCount: { increment: 1 } } : {}),
       deletedAt: null,
     },
   });
   return existing.id;
+}
+
+/** Record a repo's latest released version (idempotent-ish: only moves forward in time). */
+export async function setRepoLatestVersion(
+  db: Db,
+  repoId: string,
+  version: string,
+  at: Date,
+): Promise<void> {
+  const repo = await db.repo.findUnique({ where: { id: repoId }, select: { latestVersionAt: true } });
+  if (repo?.latestVersionAt && repo.latestVersionAt >= at) return;
+  await db.repo.update({ where: { id: repoId }, data: { latestVersion: version, latestVersionAt: at } });
 }
 
 // ── Git events (idempotent) ──────────────────────────────────────────────────

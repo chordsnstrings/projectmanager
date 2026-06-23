@@ -4,6 +4,7 @@
 import {
   appendGitEvent,
   parseEstimateFromLabels,
+  setRepoLatestVersion,
   upsertInstallation,
   upsertRepo,
   upsertTask,
@@ -86,6 +87,8 @@ export async function syncUserProjects(
           assigneeUserId: userId,
           estimateMinutes: parseEstimateFromLabels(labels),
           closedAt: null,
+          milestoneTitle: item.milestone?.title ?? null,
+          milestoneDueOn: item.milestone?.due_on ? new Date(item.milestone.due_on) : null,
         },
       );
       tasks++;
@@ -157,6 +160,18 @@ export async function syncUserProjects(
     for (const repo of active) {
       const repoId = await upsertRepoFrom(db, repo);
       repoIds.add(repoId);
+
+      // Latest release → "current version" for the repo (best-effort).
+      try {
+        const rel = await ghGet(token, `/repos/${repo.full_name}/releases/latest`);
+        const tag = rel?.tag_name ?? rel?.name;
+        if (tag) {
+          await setRepoLatestVersion(db, repoId, String(tag), new Date(rel.published_at ?? rel.created_at ?? Date.now()));
+        }
+      } catch {
+        /* no releases, or no access — fine */
+      }
+
       const branchTaskId = await upsertTask(
         db,
         { repoId, source: 'branch', githubNumber: null, branch: repo.default_branch ?? 'main' },

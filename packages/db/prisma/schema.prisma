@@ -46,6 +46,7 @@ enum GitEventType {
   pr_closed
   pr_review
   push
+  release
 }
 
 enum FlagType {
@@ -107,6 +108,8 @@ model Repo {
   githubRepoId   BigInt       @unique
   fullName       String
   defaultBranch  String       @default("main")
+  latestVersion  String? // most recent release tag/name (e.g. "v1.4.0")
+  latestVersionAt DateTime?
   installationId String
   installation   Installation @relation(fields: [installationId], references: [id])
   tasks          Task[]
@@ -127,6 +130,8 @@ model Task {
   status          TaskStatus @default(todo)
   assigneeUserId  String?
   estimateMinutes Int? // §7
+  milestoneTitle  String? // GitHub milestone (often a version, e.g. "v1.2") — completion grouping
+  milestoneDueOn  DateTime?
   reopenCount     Int        @default(0)
   createdAt       DateTime   @default(now())
   closedAt        DateTime?

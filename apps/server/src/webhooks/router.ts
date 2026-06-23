@@ -4,6 +4,7 @@ import {
   findRepoByGithubId,
   parseEstimateFromLabels,
   resolveAuthorUserId,
+  setRepoLatestVersion,
   upsertInstallation,
   upsertRepo,
   upsertTask,
@@ -34,9 +35,30 @@ export async function routeWebhook(db: Db, hook: IncomingWebhook): Promise<void>
       return handlePullRequestReview(db, payload, deliveryId);
     case 'push':
       return handlePush(db, payload, deliveryId);
+    case 'release':
+      return handleRelease(db, payload, deliveryId);
     default:
       return;
   }
+}
+
+async function handleRelease(db: Db, payload: AnyPayload, deliveryId: string): Promise<void> {
+  const rel = payload.release;
+  const repo = await findRepoByGithubId(db, payload.repository?.id);
+  if (!rel || !repo || rel.draft) return;
+  const tag = rel.tag_name ?? rel.name;
+  if (!tag) return;
+  const at = new Date(rel.published_at ?? rel.created_at ?? Date.now());
+  await setRepoLatestVersion(db, repo.id, String(tag), at);
+  await appendGitEvent(db, {
+    repoId: repo.id,
+    authorUserId: await resolveAuthorUserId(db, { githubId: rel.author?.id ?? null }),
+    type: 'release',
+    branch: String(tag),
+    message: rel.name ?? String(tag),
+    occurredAt: at,
+    deliveryId,
+  });
 }
 
 async function handleInstallation(db: Db, payload: AnyPayload): Promise<void> {
@@ -81,6 +103,8 @@ async function handleIssues(db: Db, payload: AnyPayload, _deliveryId: string): P
       estimateMinutes: parseEstimateFromLabels(labels),
       closedAt: closed ? new Date(issue.closed_at ?? Date.now()) : null,
       bumpReopen: payload.action === 'reopened',
+      milestoneTitle: issue.milestone?.title ?? null,
+      milestoneDueOn: issue.milestone?.due_on ? new Date(issue.milestone.due_on) : null,
     },
   );
 }
@@ -111,6 +135,8 @@ async function handlePullRequest(db: Db, payload: AnyPayload, deliveryId: string
       assigneeUserId,
       closedAt: merged || closedNotMerged ? new Date(pr.closed_at ?? Date.now()) : null,
       bumpReopen: payload.action === 'reopened',
+      milestoneTitle: pr.milestone?.title ?? null,
+      milestoneDueOn: pr.milestone?.due_on ? new Date(pr.milestone.due_on) : null,
     },
   );
 
