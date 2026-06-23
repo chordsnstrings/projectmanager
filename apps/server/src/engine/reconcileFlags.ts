@@ -38,12 +38,18 @@ export async function generateInferredSegments(db: Db, now = Date.now()): Promis
   return created;
 }
 
-/** Create the flag if an equivalent OPEN one doesn't already exist (idempotent). */
+/**
+ * Create the flag unless one of the same identity already exists — in ANY
+ * status. Each candidate is keyed to a concrete object (a session, a task, or a
+ * git-event), so once an admin resolves or dismisses it we must not raise it
+ * again for that same object on the next reconcile; otherwise resolved/dismissed
+ * flags reappear within minutes. A genuinely new occurrence has a different
+ * session/task/git-event id and still gets its own flag.
+ */
 export async function persistFlagCandidate(db: Db, c: FlagCandidate): Promise<boolean> {
   const existing = await db.flag.findFirst({
     where: {
       type: c.type,
-      status: 'open',
       sessionId: c.sessionId ?? null,
       taskId: c.taskId ?? null,
       gitEventId: c.gitEventId ?? null,

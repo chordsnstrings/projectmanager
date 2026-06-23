@@ -233,6 +233,33 @@ describe('authed API integration', () => {
     await prisma.flag.delete({ where: { id: flag.id } });
   });
 
+  it('does not resurrect a resolved flag on the next reconcile', async () => {
+    if (!available) return;
+    const { persistFlagCandidate } = await import('./engine/reconcileFlags');
+    const cand = {
+      type: 'long_open_session' as const,
+      userId: devId,
+      sessionId: null,
+      taskId: null,
+      gitEventId: null,
+      detail: 'resurrection test',
+    };
+    // first reconcile raises it
+    expect(await persistFlagCandidate(prisma, cand)).toBe(true);
+    const raised = await prisma.flag.findFirst({ where: { type: 'long_open_session', userId: devId, detail: 'resurrection test' } });
+    expect(raised).toBeTruthy();
+
+    // admin resolves it
+    await prisma.flag.update({ where: { id: raised!.id }, data: { status: 'resolved', resolvedAt: new Date() } });
+
+    // a later reconcile must NOT create a second one for the same object
+    expect(await persistFlagCandidate(prisma, cand)).toBe(false);
+    const count = await prisma.flag.count({ where: { type: 'long_open_session', userId: devId, detail: 'resurrection test' } });
+    expect(count).toBe(1);
+
+    await prisma.flag.deleteMany({ where: { type: 'long_open_session', userId: devId, detail: 'resurrection test' } });
+  });
+
   it('activity-check requires the bearer token and reports per-user state', async () => {
     if (!available) return;
     const noAuth = await app.inject({ method: 'GET', url: '/api/integrations/activity' });
