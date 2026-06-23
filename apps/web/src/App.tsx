@@ -20,6 +20,7 @@ import { api, ApiError } from './lib/api';
 import { relativeTime } from './lib/format';
 import { downloadTeamCsv } from './lib/csv';
 import { Logo } from './components/Logo';
+import InstallButton from './components/InstallButton';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -384,7 +385,10 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
             <Logo size={20} />
             <button onClick={() => navigate('/board')} className="btn btn-sm btn-ghost">← board</button>
           </div>
-          <button onClick={signOut} className="btn btn-sm btn-ghost">sign out</button>
+          <div className="flex items-center gap-1.5">
+            <InstallButton />
+            <button onClick={signOut} className="btn btn-sm btn-ghost">sign out</button>
+          </div>
         </header>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
           <div className="flex items-center gap-2 flex-wrap">
@@ -647,9 +651,12 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           <Logo size={22} />
           <span className="text-text3 font-mono text-xs truncate">admin · {me.githubLogin}</span>
         </div>
-        <button onClick={signOut} className="btn btn-sm btn-ghost">
-          sign out
-        </button>
+        <div className="flex items-center gap-1.5">
+          <InstallButton />
+          <button onClick={signOut} className="btn btn-sm btn-ghost">
+            sign out
+          </button>
+        </div>
       </header>
 
       <div className="px-4 sm:px-6 pt-5 max-w-6xl mx-auto w-full flex items-center gap-1.5 flex-wrap">

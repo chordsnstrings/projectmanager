@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // API path prefixes the Fastify server owns; proxied to it in dev.
-const API_PREFIXES = ['/healthz', '/me', '/api', '/auth', '/webhooks', '/tasks', '/sessions', '/dashboard', '/flags', '/questions', '/nudges'];
+const API_PREFIXES = ['/healthz', '/me', '/api', '/auth', '/webhooks', '/tasks', '/sessions', '/dashboard', '/flags', '/questions', '/nudges', '/completions'];
 
 export default defineConfig({
   plugins: [react()],
