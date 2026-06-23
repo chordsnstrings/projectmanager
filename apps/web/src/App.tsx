@@ -31,8 +31,36 @@ async function signOut() {
   window.location.href = '/';
 }
 
+export interface Route {
+  path: string;
+  params: URLSearchParams;
+  navigate: (to: string, replace?: boolean) => void;
+}
+
+/** Tiny history-based router (no dependency). Server serves index.html for all
+ *  non-API GETs, so these slugs deep-link + survive refresh. Admin pages live
+ *  under /admin/* to avoid colliding with API routes like /flags, /questions. */
+function useRoute(): Route {
+  const [loc, setLoc] = useState(() => window.location.pathname + window.location.search);
+  useEffect(() => {
+    const on = () => setLoc(window.location.pathname + window.location.search);
+    window.addEventListener('popstate', on);
+    return () => window.removeEventListener('popstate', on);
+  }, []);
+  const navigate = useCallback((to: string, replace = false) => {
+    if (to === window.location.pathname + window.location.search) return;
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', to);
+    setLoc(to);
+  }, []);
+  const q = loc.indexOf('?');
+  const path = q === -1 ? loc : loc.slice(0, q);
+  const params = new URLSearchParams(q === -1 ? '' : loc.slice(q + 1));
+  return { path, params, navigate };
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: 'loading' });
+  const route = useRoute();
 
   useEffect(() => {
     api<Me>('/me')
@@ -40,9 +68,20 @@ export default function App() {
       .catch(() => setAuth({ kind: 'anon' }));
   }, []);
 
+  // Land on the right slug once the role is known.
+  useEffect(() => {
+    if (auth.kind !== 'authed') return;
+    const p = route.path;
+    if (auth.me.role === 'dev') {
+      if (p !== '/board') route.navigate('/board', true);
+    } else if (!p.startsWith('/admin')) {
+      route.navigate('/admin/team', true);
+    }
+  }, [auth, route.path, route.navigate]);
+
   if (auth.kind === 'loading') return <Splash>connecting…</Splash>;
   if (auth.kind === 'anon') return <SignIn />;
-  return auth.me.role === 'admin' ? <AdminApp me={auth.me} /> : <DevApp me={auth.me} />;
+  return auth.me.role === 'admin' ? <AdminApp me={auth.me} route={route} /> : <DevApp me={auth.me} />;
 }
 
 // ── Chrome ──────────────────────────────────────────────────────────────────
@@ -296,18 +335,32 @@ function shiftDate(d: string, delta: number): string {
 
 type AdminTab = 'team' | 'flags' | 'questions';
 
-function AdminApp({ me }: { me: Me }) {
-  const [tab, setTab] = useState<AdminTab>('team');
-  const [date, setDate] = useState(todayStr);
+function AdminApp({ me, route }: { me: Me; route: Route }) {
+  const { path, params, navigate } = route;
+  // Navigation state is derived from the slug.
+  const personMatch = path.match(/^\/admin\/u\/([^/]+)\/(day|trends)$/);
+  const selectedUser = personMatch ? personMatch[1]! : null;
+  const personView: 'day' | 'trends' = personMatch && personMatch[2] === 'trends' ? 'trends' : 'day';
+  const tab: AdminTab = path.startsWith('/admin/flags')
+    ? 'flags'
+    : path.startsWith('/admin/questions')
+      ? 'questions'
+      : 'team';
+  const date = params.get('date') ?? todayStr();
+  const isToday = date === todayStr();
+
   const [team, setTeam] = useState<TeamDashboard | null>(null);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
   const [trends, setTrends] = useState<TrendsDTO | null>(null);
-  const [personView, setPersonView] = useState<'day' | 'trends'>('day');
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [flags, setFlags] = useState<FlagDTO[]>([]);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const isToday = date === todayStr();
+
+  // setDate keeps the slug, writing ?date= (dropped when today).
+  const setDate: React.Dispatch<React.SetStateAction<string>> = (upd) => {
+    const next = typeof upd === 'function' ? (upd as (d: string) => string)(date) : upd;
+    navigate(`${path}${next === todayStr() ? '' : `?date=${next}`}`);
+  };
 
   const loadTeam = useCallback(() => {
     const from = `${date}T00:00:00.000Z`;
@@ -351,18 +404,12 @@ function AdminApp({ me }: { me: Me }) {
   }, [tab, loadFlags, loadQuestions]);
 
   useEffect(() => {
-    if (selectedUser) void loadDay(selectedUser);
-  }, [date, selectedUser, loadDay]);
+    if (!selectedUser) return;
+    if (personView === 'trends') void loadTrends(selectedUser);
+    else void loadDay(selectedUser);
+  }, [selectedUser, personView, date, loadDay, loadTrends]);
 
-  const selectUser = useCallback(
-    (userId: string) => {
-      setSelectedUser(userId);
-      setPersonView('day');
-      void loadDay(userId);
-      void loadTrends(userId);
-    },
-    [loadDay, loadTrends],
-  );
+  const selectUser = useCallback((userId: string) => navigate(`/admin/u/${userId}/day`), [navigate]);
 
   const onResolve = useCallback(
     (id: string) => {
@@ -415,18 +462,11 @@ function AdminApp({ me }: { me: Me }) {
 
   const openCount = day ? day.lanes.flatMap((l) => l.sessions).filter((s) => s.isOpen).length : 0;
 
-  const backToTeam = () => {
-    setSelectedUser(null);
-    setDay(null);
-    setTrends(null);
-  };
+  const backToTeam = () => navigate('/admin/team');
 
   const tabBtn = (t: AdminTab, label: string) => (
     <button
-      onClick={() => {
-        setTab(t);
-        backToTeam();
-      }}
+      onClick={() => navigate(`/admin/${t}`)}
       className={`btn btn-sm ${
         tab === t
           ? 'border-hair2 text-text bg-surface2/80'
@@ -468,13 +508,13 @@ function AdminApp({ me }: { me: Me }) {
               </button>
               <div className="inline-flex rounded-lg border border-hair overflow-hidden">
                 <button
-                  onClick={() => setPersonView('day')}
+                  onClick={() => navigate(`/admin/u/${selectedUser}/day`)}
                   className={`font-mono text-xs px-3.5 h-8 transition-colors ${personView === 'day' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
                 >
                   day
                 </button>
                 <button
-                  onClick={() => setPersonView('trends')}
+                  onClick={() => navigate(`/admin/u/${selectedUser}/trends`)}
                   className={`font-mono text-xs px-3.5 h-8 border-l border-hair transition-colors ${personView === 'trends' ? 'bg-surface2/80 text-text' : 'text-text3 hover:text-text2'}`}
                 >
                   trends

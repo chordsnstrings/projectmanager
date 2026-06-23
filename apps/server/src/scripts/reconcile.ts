@@ -6,10 +6,16 @@
  * Usage: node apps/server/dist/scripts/reconcile.js
  */
 import { prisma } from '@cadence/db';
-import { autoStopOnCommit, generateInferredSegments, reconcileFlags } from '../engine/reconcileFlags';
+import {
+  autoCloseStaleDays,
+  autoStopOnCommit,
+  generateInferredSegments,
+  reconcileFlags,
+} from '../engine/reconcileFlags';
 
 async function main(): Promise<void> {
   const startedAt = Date.now();
+  const closedStale = await autoCloseStaleDays(prisma);
   const stopped = await autoStopOnCommit(prisma);
   const segments = await generateInferredSegments(prisma);
   const result = await reconcileFlags(prisma);
@@ -17,6 +23,7 @@ async function main(): Promise<void> {
     JSON.stringify({
       job: 'reconcile',
       ...result,
+      closedStale,
       autoStopped: stopped,
       segmentsCreated: segments,
       ms: Date.now() - startedAt,

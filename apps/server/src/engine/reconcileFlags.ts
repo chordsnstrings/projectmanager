@@ -89,6 +89,23 @@ export async function autoStopOnCommit(db: Db, _now = Date.now()): Promise<numbe
   return closed;
 }
 
+/**
+ * Daily hygiene: a session left open from a previous day is auto-closed at that
+ * day's rollover (UTC midnight). Keeps each day's record self-contained so the
+ * dashboard doesn't accumulate stale "running" sessions across days.
+ */
+export async function autoCloseStaleDays(db: Db, now = Date.now()): Promise<number> {
+  const d = new Date(now);
+  const todayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const stale = await db.session.findMany({
+    where: { isOpen: true, deletedAt: null, startedAt: { lt: todayStart } },
+  });
+  for (const s of stale) {
+    await db.session.update({ where: { id: s.id }, data: { isOpen: false, endedAt: todayStart } });
+  }
+  return stale.length;
+}
+
 export interface ReconcileResult {
   openSessions: number;
   flagsCreated: number;
