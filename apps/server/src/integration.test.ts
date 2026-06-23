@@ -170,4 +170,65 @@ describe('authed API integration', () => {
     await prisma.repo.delete({ where: { id: repo.id } });
     await prisma.installation.delete({ where: { id: inst.id } });
   });
+
+  it('backfills a same-day off-task block; rejects out-of-day ranges', async () => {
+    if (!available) return;
+    const now = new Date();
+    const start = new Date(now.getTime() - 60 * 60000).toISOString();
+    const end = new Date(now.getTime() - 30 * 60000).toISOString();
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      headers: { cookie: devCookie },
+      payload: { offTaskLabel: 'meeting', startedAt: start, endedAt: end },
+    });
+    expect(ok.statusCode).toBe(201);
+    expect(ok.json().isOpen).toBe(false);
+    expect(ok.json().offTaskLabel).toBe('meeting');
+
+    const yesterday = new Date(now.getTime() - 26 * 3600_000).toISOString();
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      headers: { cookie: devCookie },
+      payload: { offTaskLabel: 'meeting', startedAt: yesterday, endedAt: now.toISOString() },
+    });
+    expect(bad.statusCode).toBe(400);
+  });
+
+  it('toggles stop-on-commit via /me/settings', async () => {
+    if (!available) return;
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/me/settings',
+      headers: { cookie: devCookie },
+      payload: { stopOnCommit: true },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().stopOnCommit).toBe(true);
+    await app.inject({ method: 'PATCH', url: '/me/settings', headers: { cookie: devCookie }, payload: { stopOnCommit: false } });
+  });
+
+  it('admin resolves a flag; dev cannot', async () => {
+    if (!available) return;
+    const flag = await prisma.flag.create({
+      data: { type: 'long_open_session', userId: devId, detail: 'test flag', status: 'open' },
+    });
+    const forbidden = await app.inject({
+      method: 'PATCH',
+      url: `/flags/${flag.id}`,
+      headers: { cookie: devCookie },
+      payload: { status: 'resolved' },
+    });
+    expect(forbidden.statusCode).toBe(403);
+    const ok = await app.inject({
+      method: 'PATCH',
+      url: `/flags/${flag.id}`,
+      headers: { cookie: adminCookie },
+      payload: { status: 'resolved' },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().status).toBe('resolved');
+    await prisma.flag.delete({ where: { id: flag.id } });
+  });
 });

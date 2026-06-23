@@ -18,6 +18,7 @@ body {
   color: #e8eaed;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Keyboard focus ring (P6) — visible only for keyboard nav, brass accent. */
@@ -25,6 +26,85 @@ body {
   outline: 2px solid #c8a96a;
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Calmer, thinner scrollbars to match the instrument aesthetic. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+*::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Reusable component layer ──────────────────────────────────────────────
+   A small, consistent system: surfaces (.card), buttons (.btn-*), chips,
+   labels. Used across programmer + admin screens for one coherent look. */
+@layer components {
+  /* Elevated surface — hairline ring, soft corners, flat (no shadow). */
+  .card {
+    @apply rounded-xl border border-hair bg-panel;
+  }
+
+  /* Section label — small, uppercase, tracked mono "instrument" caption. */
+  .label {
+    @apply font-mono text-[10px] uppercase tracking-[0.12em] text-text3;
+  }
+
+  /* Button base: tactile, ≥36px target, smooth color transition. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg
+           border font-mono text-xs leading-none
+           transition-colors duration-150 select-none
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-sm {
+    @apply h-8 px-2.5;
+  }
+  .btn-md {
+    @apply h-9 px-3;
+  }
+  .btn-lg {
+    @apply h-10 px-4;
+  }
+  /* Neutral, recessive control. */
+  .btn-ghost {
+    @apply border-hair text-text2 hover:text-text hover:bg-surface2/70 hover:border-hair2;
+  }
+  /* Quiet control that reads as tertiary until hovered. */
+  .btn-quiet {
+    @apply border-transparent text-text3 hover:text-text hover:bg-surface2/60;
+  }
+  /* The hero: primary action — brass, sparing. */
+  .btn-primary {
+    @apply border-transparent bg-brass text-bg font-medium hover:bg-brass/90 active:bg-brass/80;
+  }
+  /* Pill chip — non-git labels, filters. */
+  .chip {
+    @apply inline-flex items-center justify-center h-8 px-3 rounded-full
+           border border-hair font-mono text-xs text-text2
+           transition-colors duration-150
+           hover:text-text hover:border-hair2 hover:bg-surface2/60;
+  }
+  /* Small status/meta tag. */
+  .tag {
+    @apply inline-flex items-center rounded-md border px-1.5 py-0.5
+           font-mono text-[10px] uppercase tracking-[0.08em];
+  }
+  /* Form field — inputs / selects. */
+  .field {
+    @apply rounded-lg border border-hair bg-surface text-text
+           placeholder:text-text3 transition-colors duration-150
+           focus:outline-none focus:border-brass/50;
+  }
 }
 
 /* Honour reduced-motion preferences (§12 P6, wired early). */

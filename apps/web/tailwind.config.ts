@@ -26,13 +26,29 @@ export default {
       },
       borderColor: {
         DEFAULT: 'rgba(255,255,255,.08)',
-        hair: 'rgba(255,255,255,.08)',
-        hair2: 'rgba(255,255,255,.16)',
+        hair: 'rgba(255,255,255,.07)',
+        hair2: 'rgba(255,255,255,.14)',
       },
       borderRadius: {
         DEFAULT: '8px',
         lg: '12px',
-        xl: '14px',
+        xl: '16px',
+        '2xl': '20px',
+      },
+      letterSpacing: {
+        tightish: '-0.01em',
+      },
+      transitionDuration: {
+        DEFAULT: '150ms',
+      },
+      keyframes: {
+        'fade-in': {
+          from: { opacity: '0', transform: 'translateY(2px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 180ms ease-out',
       },
       fontFamily: {
         sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
