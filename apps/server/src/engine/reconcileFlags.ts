@@ -4,6 +4,38 @@ import type { Db } from '../sync/upsert';
 import { env } from '../env';
 import { longOpenSession, openNoActivity, overrun, type FlagCandidate } from './flags';
 import { sumMinutes } from './sessionMath';
+import { dominantActivity } from './activity';
+
+/**
+ * Generate one inferred ActivitySegment per recent session that has commits but
+ * no segments yet, typed by the dominant activity of those commits. This is what
+ * colors the day-timeline bars (§9b) when segments weren't set by a manual tap.
+ */
+export async function generateInferredSegments(db: Db, now = Date.now()): Promise<number> {
+  let created = 0;
+  const since = new Date(now - 3 * 86_400_000);
+  const sessions = await db.session.findMany({
+    where: { deletedAt: null, taskId: { not: null }, startedAt: { gte: since } },
+    include: { segments: { take: 1 } },
+  });
+  for (const s of sessions) {
+    if (s.segments.length > 0 || !s.taskId) continue;
+    const end = s.endedAt ?? new Date(now);
+    const commits = await db.gitEvent.findMany({
+      where: { type: 'commit', taskId: s.taskId, occurredAt: { gte: s.startedAt, lte: end } },
+    });
+    if (commits.length === 0) continue;
+    const type =
+      dominantActivity(
+        commits.map((c) => ({ message: c.message, additions: c.additions, occurredAt: c.occurredAt.getTime() })),
+      ) ?? 'coding';
+    await db.activitySegment.create({
+      data: { sessionId: s.id, type, source: 'inferred', startedAt: s.startedAt, endedAt: end },
+    });
+    created++;
+  }
+  return created;
+}
 
 /** Create the flag if an equivalent OPEN one doesn't already exist (idempotent). */
 export async function persistFlagCandidate(db: Db, c: FlagCandidate): Promise<boolean> {

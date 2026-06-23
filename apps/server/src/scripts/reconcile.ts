@@ -6,15 +6,17 @@
  * Usage: node apps/server/dist/scripts/reconcile.js
  */
 import { prisma } from '@cadence/db';
-import { reconcileFlags } from '../engine/reconcileFlags';
+import { generateInferredSegments, reconcileFlags } from '../engine/reconcileFlags';
 
 async function main(): Promise<void> {
   const startedAt = Date.now();
+  const segments = await generateInferredSegments(prisma);
   const result = await reconcileFlags(prisma);
   console.log(
     JSON.stringify({
       job: 'reconcile',
       ...result,
+      segmentsCreated: segments,
       ms: Date.now() - startedAt,
       at: new Date().toISOString(),
     }),

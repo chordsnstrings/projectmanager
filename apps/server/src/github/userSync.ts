@@ -2,6 +2,7 @@
 // assigned open issues + authored open PRs and seed Repo/Task rows, so a dev sees
 // their projects immediately without an org-wide GitHub App install.
 import {
+  appendGitEvent,
   parseEstimateFromLabels,
   upsertInstallation,
   upsertRepo,
@@ -135,12 +136,15 @@ export async function syncUserProjects(
       '/user/repos?sort=pushed&per_page=30&affiliation=owner,collaborator,organization_member',
     );
     const cutoff = Date.now() - 60 * 86_400_000; // last 60 days of activity
-    for (const repo of repos) {
-      if (!repo?.owner || repo.archived || repo.disabled) continue;
-      if (repo.pushed_at && Date.parse(repo.pushed_at) < cutoff) continue;
+    const since = new Date(Date.now() - 14 * 86_400_000).toISOString(); // commits window
+    // Cap the number of repos we deep-sync commits for, to bound API calls.
+    const active = repos
+      .filter((r) => r?.owner && !r.archived && !r.disabled && (!r.pushed_at || Date.parse(r.pushed_at) >= cutoff))
+      .slice(0, 12);
+    for (const repo of active) {
       const repoId = await upsertRepoFrom(db, repo);
       repoIds.add(repoId);
-      await upsertTask(
+      const branchTaskId = await upsertTask(
         db,
         { repoId, source: 'branch', githubNumber: null, branch: repo.default_branch ?? 'main' },
         {
@@ -151,6 +155,30 @@ export async function syncUserProjects(
         },
       );
       tasks++;
+
+      // Ingest the user's recent commits → git-events (so the timeline, flags,
+      // nudges, and attribution have real data even without the App webhooks).
+      try {
+        const commits: any[] = await ghGet(
+          token,
+          `/repos/${repo.full_name}/commits?author=${encodeURIComponent(login)}&since=${since}&per_page=20`,
+        );
+        for (const c of commits) {
+          await appendGitEvent(db, {
+            repoId,
+            taskId: branchTaskId,
+            authorUserId: userId,
+            type: 'commit',
+            sha: c.sha,
+            branch: repo.default_branch ?? 'main',
+            message: c.commit?.message ?? null,
+            occurredAt: new Date(c.commit?.author?.date ?? Date.now()),
+            deliveryId: `usersync:${repoId}:${c.sha}`,
+          });
+        }
+      } catch {
+        /* commits are best-effort */
+      }
     }
   } catch {
     /* ignore */
