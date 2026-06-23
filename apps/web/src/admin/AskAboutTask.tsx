@@ -75,7 +75,7 @@ export default function AskAboutTask({
   }
 
   return (
-    <div className="card p-4 flex flex-col gap-3 animate-fade-in w-full sm:w-[28rem]">
+    <div className="card p-4 flex flex-col gap-3 animate-fade-in w-full sm:w-[28rem] max-w-full min-w-0">
       <div className="flex items-center justify-between">
         <span className="label">ask about a task</span>
         <button type="button" onClick={() => setOpen(false)} className="text-text3 hover:text-text2 text-sm">
@@ -88,7 +88,7 @@ export default function AskAboutTask({
         <select
           value={taskId}
           onChange={(e) => setTaskId(e.target.value)}
-          className="field font-mono text-xs px-2.5 h-9 [color-scheme:dark]"
+          className="field font-mono text-xs px-2.5 h-9 w-full min-w-0 [color-scheme:dark]"
         >
           {sorted.length === 0 && <option value="">no tasks found</option>}
           {sorted.map((t) => (

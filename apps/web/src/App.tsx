@@ -105,7 +105,7 @@ export default function App() {
 
 // ── Chrome ──────────────────────────────────────────────────────────────────
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-full text-text font-sans">{children}</div>;
+  return <div className="min-h-full text-text font-sans overflow-x-hidden">{children}</div>;
 }
 function Splash({ children }: { children: React.ReactNode }) {
   return (
@@ -690,7 +690,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                 </button>
               </div>
               {personView === 'day' && <DateNav date={date} setDate={setDate} />}
-              <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+              <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 flex-wrap sm:justify-end min-w-0">
                 {personView === 'day' && openCount > 0 && (
                   <button
                     onClick={endOpenSessions}
@@ -748,7 +748,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                 </button>
               </div>
               <DateNav date={date} setDate={setDate} />
-              <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+              <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 flex-wrap sm:justify-end min-w-0">
                 <RunLoginCheckButton />
                 <SendDigestButton />
                 {team && team.members.length > 0 && (
