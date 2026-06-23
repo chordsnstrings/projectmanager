@@ -49,6 +49,8 @@ services:
       - { key: SMTP_PASS, scope: RUN_TIME, type: SECRET }
       - { key: MAIL_FROM, scope: RUN_TIME }
       - { key: DIGEST_TO, scope: RUN_TIME }
+      # Static bearer token for the external activity-check robot (/api/integrations/*).
+      - { key: CADENCE_API_TOKEN, scope: RUN_TIME, type: SECRET }
 jobs:
   - name: migrate
     kind: PRE_DEPLOY

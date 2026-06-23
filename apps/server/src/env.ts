@@ -40,6 +40,10 @@ export const env = {
     .map((s) => s.trim())
     .filter(Boolean),
 
+  // Static bearer token for machine integrations (e.g. the external activity-check
+  // robot). When unset, the /api/integrations/* endpoints return 503.
+  CADENCE_API_TOKEN: process.env.CADENCE_API_TOKEN ?? '',
+
   // Tunables (§6/§11)
   IDLE_MINUTES: num('IDLE_MINUTES', 90),
   MAX_OPEN_HOURS: num('MAX_OPEN_HOURS', 8),

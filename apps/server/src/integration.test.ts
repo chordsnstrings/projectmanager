@@ -18,6 +18,7 @@ beforeAll(async () => {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ?? 'postgresql://postgres@127.0.0.1:5433/cadence?schema=public';
   process.env.SESSION_SECRET = 'itest-secret';
+  process.env.CADENCE_API_TOKEN = 'itest-api-token';
   try {
     const db = await import('@cadence/db');
     prisma = db.prisma;
@@ -230,5 +231,35 @@ describe('authed API integration', () => {
     expect(ok.statusCode).toBe(200);
     expect(ok.json().status).toBe('resolved');
     await prisma.flag.delete({ where: { id: flag.id } });
+  });
+
+  it('activity-check requires the bearer token and reports per-user state', async () => {
+    if (!available) return;
+    const noAuth = await app.inject({ method: 'GET', url: '/api/integrations/activity' });
+    expect(noAuth.statusCode).toBe(401);
+
+    const badAuth = await app.inject({
+      method: 'GET',
+      url: '/api/integrations/activity',
+      headers: { authorization: 'Bearer wrong' },
+    });
+    expect(badAuth.statusCode).toBe(401);
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/integrations/activity?windowMinutes=60',
+      headers: { authorization: 'Bearer itest-api-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(String(body.signInUrl)).toMatch(/\/auth\/github$/);
+    expect(typeof body.hasActivity).toBe('boolean');
+    expect(Array.isArray(body.users)).toBe(true);
+    expect(Array.isArray(body.inactive)).toBe(true);
+    const devEntry = body.users.find((u: { userId: string }) => u.userId === devId);
+    expect(devEntry).toBeTruthy();
+    expect(typeof devEntry.startedInWindow).toBe('number');
+    expect(typeof devEntry.hasOpenSession).toBe('boolean');
+    expect(devEntry.timezone).toBeTruthy();
   });
 });

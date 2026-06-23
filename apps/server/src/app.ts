@@ -14,6 +14,7 @@ import { sessionRoutes } from './routes/sessions';
 import { flagRoutes } from './routes/flags';
 import { questionRoutes } from './routes/questions';
 import { dashboardRoutes } from './routes/dashboard';
+import { integrationRoutes } from './routes/integrations';
 
 /** Build the Fastify app (exported so tests can import without binding a port). */
 export async function buildApp(): Promise<FastifyInstance> {
@@ -63,6 +64,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(flagRoutes);
   await app.register(questionRoutes);
   await app.register(dashboardRoutes);
+  await app.register(integrationRoutes);
 
   // ── Static SPA (apps/web/dist), with history-API fallback ─────────────────
   const webDist = resolve(__dirname, '../../web/dist');
