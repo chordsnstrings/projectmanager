@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { TimelineSession } from '@cadence/shared';
 import { ACTIVITY_COLORS } from '../lib/activity';
 import { fmtClock, fmtDuration } from '../lib/format';
@@ -17,12 +18,19 @@ export default function SessionDetail({
   session,
   laneTitle,
   onClose,
+  onAsk,
+  canAsk = false,
 }: {
   session: TimelineSession;
   laneTitle: string;
   onClose: () => void;
+  /** raise a question pinned to this session/task (gates the dev's next completion) */
+  onAsk?: (body: string) => void;
+  canAsk?: boolean;
 }) {
   const breakdown = activityBreakdown(session);
+  const [asking, setAsking] = useState(false);
+  const [body, setBody] = useState('');
   return (
     <div className="border-t border-hair2 bg-surface/60 px-4 py-3">
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -33,15 +41,61 @@ export default function SessionDetail({
           </span>
           {session.isOpen && <span className="ml-2 font-mono text-[10px] text-success">running</span>}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 w-8 h-8 inline-flex items-center justify-center rounded border border-hair text-text3 hover:text-text hover:border-hair2"
-          aria-label="close detail"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {onAsk && (
+            <button
+              type="button"
+              onClick={() => setAsking((a) => !a)}
+              disabled={!canAsk}
+              title={canAsk ? 'raise a question on this session' : 'off-task sessions have no task to ask about'}
+              className="font-mono text-xs px-2.5 h-8 rounded border border-brass/50 text-brass hover:bg-brass/10 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              ask…
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair text-text3 hover:text-text hover:border-hair2"
+            aria-label="close detail"
+          >
+            ✕
+          </button>
+        </div>
       </div>
+
+      {asking && onAsk && (
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            autoFocus
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && body.trim()) {
+                onAsk(body.trim());
+                setBody('');
+                setAsking(false);
+              }
+              if (e.key === 'Escape') setAsking(false);
+            }}
+            placeholder="ask why… (gates their next task completion)"
+            className="flex-1 min-w-0 text-sm bg-surface border border-hair2 rounded px-2.5 h-9 text-text placeholder:text-text3 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (body.trim()) {
+                onAsk(body.trim());
+                setBody('');
+                setAsking(false);
+              }
+            }}
+            className="font-mono text-xs px-3 h-9 rounded bg-brass text-bg font-medium hover:opacity-90"
+          >
+            send
+          </button>
+        </div>
+      )}
 
       {session.intent && (
         <div className="text-xs text-text mb-1">

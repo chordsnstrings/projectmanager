@@ -51,7 +51,10 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         where: { id: req.params.id, deletedAt: null },
       });
       if (!session) return reply.code(404).send({ error: 'session_not_found' });
-      if (session.userId !== user.id) return reply.code(403).send({ error: 'forbidden' });
+      // Owner stops their own; an admin may stop anyone's (cleanup).
+      if (session.userId !== user.id && user.role !== 'admin') {
+        return reply.code(403).send({ error: 'forbidden' });
+      }
 
       const { summary, blocked, markTaskDone } = req.body ?? {};
 

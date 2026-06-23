@@ -7,6 +7,7 @@ import SessionDetail from './SessionDetail';
 
 export interface DayTimelineProps {
   data: DayTimelineDTO;
+  onAskQuestion?: (args: { targetUserId: string; taskId: string; sessionId: string; body: string }) => void;
 }
 
 function HeaderCard({
@@ -65,15 +66,15 @@ function concurrentBands(
   return bands;
 }
 
-export default function DayTimeline({ data }: DayTimelineProps) {
+export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
   const w = makeWindow(data.dayStart, data.dayEnd);
   const ticks = hourTicks(w);
   const bands = concurrentBands(data, w);
   const [selected, setSelected] = useState<TimelineSession | null>(null);
-  const selectedLaneTitle =
-    selected != null
-      ? (data.lanes.find((l) => l.sessions.some((s) => s.id === selected.id))?.title ?? 'session')
-      : '';
+  const selectedLane =
+    selected != null ? data.lanes.find((l) => l.sessions.some((s) => s.id === selected.id)) : undefined;
+  const selectedLaneTitle = selectedLane?.title ?? '';
+  const selectedTaskId = selectedLane?.taskId ?? null;
   // Unresolved flags drive the danger markers on bars.
   const flaggedIds = new Set(
     data.flags.filter((f) => f.status === 'open' && f.sessionId).map((f) => f.sessionId as string),
@@ -157,7 +158,20 @@ export default function DayTimeline({ data }: DayTimelineProps) {
 
       {/* Selected-session detail — rendered in normal flow (no clipping). */}
       {selected && (
-        <SessionDetail session={selected} laneTitle={selectedLaneTitle} onClose={() => setSelected(null)} />
+        <SessionDetail
+          session={selected}
+          laneTitle={selectedLaneTitle}
+          onClose={() => setSelected(null)}
+          canAsk={Boolean(selectedTaskId)}
+          onAsk={
+            onAskQuestion
+              ? (body) => {
+                  if (selectedTaskId)
+                    onAskQuestion({ targetUserId: data.userId, taskId: selectedTaskId, sessionId: selected.id, body });
+                }
+              : undefined
+          }
+        />
       )}
 
       <p className="sm:hidden px-4 py-1.5 font-mono text-[10px] text-text3 border-t border-hair">

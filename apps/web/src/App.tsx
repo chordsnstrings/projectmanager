@@ -364,6 +364,25 @@ function AdminApp({ me }: { me: Me }) {
     [loadFlags, loadQuestions],
   );
 
+  const onAskQuestion = useCallback(
+    (args: { targetUserId: string; taskId: string; sessionId: string; body: string }) => {
+      void api('/questions', { method: 'POST', body: JSON.stringify(args) }).then(() => void loadQuestions());
+    },
+    [loadQuestions],
+  );
+
+  const endOpenSessions = useCallback(async () => {
+    if (!day) return;
+    const open = day.lanes.flatMap((l) => l.sessions).filter((s) => s.isOpen);
+    await Promise.all(
+      open.map((s) => api(`/sessions/${s.id}/stop`, { method: 'POST', body: '{}' }).catch(() => {})),
+    );
+    if (selectedUser) await loadDay(selectedUser);
+    void loadTeam();
+  }, [day, selectedUser, loadDay, loadTeam]);
+
+  const openCount = day ? day.lanes.flatMap((l) => l.sessions).filter((s) => s.isOpen).length : 0;
+
   const backToTeam = () => {
     setSelectedUser(null);
     setDay(null);
@@ -431,9 +450,22 @@ function AdminApp({ me }: { me: Me }) {
                 </button>
               </div>
               {personView === 'day' && <DateNav date={date} setDate={setDate} />}
+              {personView === 'day' && openCount > 0 && (
+                <button
+                  onClick={endOpenSessions}
+                  className="font-mono text-xs px-2.5 h-8 rounded border border-danger/50 text-danger hover:bg-danger/10 ml-auto"
+                  title="stop all of this person's open sessions"
+                >
+                  ■ end {openCount} open
+                </button>
+              )}
             </div>
             {personView === 'day' ? (
-              day ? <DayTimeline data={day} /> : <div className="font-mono text-text3 text-sm">loading day…</div>
+              day ? (
+                <DayTimeline data={day} onAskQuestion={onAskQuestion} />
+              ) : (
+                <div className="font-mono text-text3 text-sm">loading day…</div>
+              )
             ) : trends ? (
               <Trends data={trends} />
             ) : (
