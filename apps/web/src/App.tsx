@@ -22,6 +22,7 @@ import TeamOverview from './admin/TeamOverview';
 import DayTimeline from './admin/DayTimeline';
 import Trends from './admin/Trends';
 import FlagsPanel from './admin/FlagsPanel';
+import AskAboutTask from './admin/AskAboutTask';
 import QuestionsPanel from './admin/QuestionsPanel';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
@@ -548,15 +549,24 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                 </button>
               </div>
               {personView === 'day' && <DateNav date={date} setDate={setDate} />}
-              {personView === 'day' && openCount > 0 && (
-                <button
-                  onClick={endOpenSessions}
-                  className="btn btn-sm border-danger/40 text-danger hover:bg-danger/10 ml-auto"
-                  title="stop all of this person's open sessions"
-                >
-                  ■ end {openCount} open
-                </button>
-              )}
+              <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                {personView === 'day' && openCount > 0 && (
+                  <button
+                    onClick={endOpenSessions}
+                    className="btn btn-sm border-danger/40 text-danger hover:bg-danger/10"
+                    title="stop all of this person's open sessions"
+                  >
+                    ■ end {openCount} open
+                  </button>
+                )}
+                <AskAboutTask
+                  targetUserId={selectedUser}
+                  onSent={() => {
+                    void loadQuestions();
+                    if (personView === 'day') void loadDay(selectedUser);
+                  }}
+                />
+              </div>
             </div>
             {personView === 'day' ? (
               day ? (
