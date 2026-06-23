@@ -23,6 +23,7 @@ import DayTimeline from './admin/DayTimeline';
 import Trends from './admin/Trends';
 import FlagsPanel from './admin/FlagsPanel';
 import AskAboutTask from './admin/AskAboutTask';
+import SendDigestButton from './admin/SendDigestButton';
 import QuestionsPanel from './admin/QuestionsPanel';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
@@ -584,14 +585,14 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           <div className="animate-fade-in">
             <div className="mb-5 flex items-center gap-2 flex-wrap">
               <DateNav date={date} setDate={setDate} />
-              {team && team.members.length > 0 && (
-                <button
-                  onClick={() => downloadTeamCsv(team)}
-                  className="btn btn-sm btn-ghost ml-auto"
-                >
-                  ↓ CSV
-                </button>
-              )}
+              <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                <SendDigestButton />
+                {team && team.members.length > 0 && (
+                  <button onClick={() => downloadTeamCsv(team)} className="btn btn-sm btn-ghost">
+                    ↓ CSV
+                  </button>
+                )}
+              </div>
             </div>
             {!loaded ? (
               <Loading>loading team…</Loading>
