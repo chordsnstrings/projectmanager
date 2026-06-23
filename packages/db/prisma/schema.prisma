@@ -1,0 +1,219 @@
+// Cadence data model (spec §5). PostgreSQL 17 in production.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  dev
+}
+
+enum TaskSource {
+  issue
+  pr
+  branch
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  in_review
+  done
+}
+
+enum ActivityType {
+  coding
+  debugging
+  research
+  agent
+  review
+}
+
+enum ActivitySource {
+  inferred
+  manual
+}
+
+enum GitEventType {
+  commit
+  pr_opened
+  pr_merged
+  pr_closed
+  pr_review
+  push
+}
+
+enum FlagType {
+  open_no_activity
+  activity_no_session
+  long_open_session
+  overrun
+}
+
+enum FlagStatus {
+  open
+  resolved
+  dismissed
+}
+
+enum QuestionStatus {
+  open
+  answered
+}
+
+model User {
+  id          String      @id @default(cuid())
+  githubId    BigInt      @unique
+  githubLogin String      @unique
+  name        String?
+  email       String?
+  avatarUrl   String?
+  role        Role        @default(dev)
+  emails      UserEmail[]
+  sessions    Session[]
+  createdAt   DateTime    @default(now())
+  deletedAt   DateTime?
+}
+
+model UserEmail {
+  // alias resolution for commit-author matching
+  id     String @id @default(cuid())
+  email  String @unique
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Installation {
+  id                   String    @id @default(cuid())
+  githubInstallationId BigInt    @unique
+  accountLogin         String
+  repos                Repo[]
+  createdAt            DateTime  @default(now())
+  deletedAt            DateTime?
+}
+
+model Repo {
+  id             String       @id @default(cuid())
+  githubRepoId   BigInt       @unique
+  fullName       String
+  defaultBranch  String       @default("main")
+  installationId String
+  installation   Installation @relation(fields: [installationId], references: [id])
+  tasks          Task[]
+  gitEvents      GitEvent[]
+  connectedAt    DateTime     @default(now())
+  deletedAt      DateTime?
+}
+
+model Task {
+  id              String     @id @default(cuid())
+  repoId          String
+  repo            Repo       @relation(fields: [repoId], references: [id])
+  source          TaskSource
+  githubNumber    Int? // issue/PR number; null for pure-branch tasks
+  branch          String? // branch name when source = branch/pr
+  title           String
+  status          TaskStatus @default(todo)
+  assigneeUserId  String?
+  estimateMinutes Int? // §7
+  reopenCount     Int        @default(0)
+  createdAt       DateTime   @default(now())
+  closedAt        DateTime?
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+  sessions        Session[]
+  gitEvents       GitEvent[]
+
+  @@unique([repoId, source, githubNumber, branch])
+  @@index([assigneeUserId, status])
+}
+
+model Session {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id])
+  taskId       String? // null only for off-task sessions
+  task         Task?             @relation(fields: [taskId], references: [id])
+  offTaskLabel String? // when taskId is null (research, meeting…)
+  startedAt    DateTime
+  endedAt      DateTime?
+  isOpen       Boolean           @default(true)
+  intent       String?
+  summary      String?
+  blocked      Boolean           @default(false)
+  segments     ActivitySegment[]
+  createdAt    DateTime          @default(now())
+  deletedAt    DateTime?
+
+  @@index([userId, startedAt])
+}
+
+model ActivitySegment {
+  id        String         @id @default(cuid())
+  sessionId String
+  session   Session        @relation(fields: [sessionId], references: [id])
+  type      ActivityType
+  source    ActivitySource @default(inferred)
+  startedAt DateTime
+  endedAt   DateTime
+}
+
+model GitEvent {
+  id           String       @id @default(cuid())
+  repoId       String
+  repo         Repo         @relation(fields: [repoId], references: [id])
+  taskId       String? // resolved by attribution (§6)
+  task         Task?        @relation(fields: [taskId], references: [id])
+  authorUserId String? // resolved by githubId/email
+  type         GitEventType
+  sha          String?
+  prNumber     Int?
+  branch       String?
+  additions    Int?
+  deletions    Int?
+  filesChanged Int?
+  message      String?
+  occurredAt   DateTime
+  deliveryId   String?      @unique // webhook idempotency
+  raw          Json?
+  createdAt    DateTime     @default(now())
+
+  @@index([repoId, occurredAt])
+  @@index([taskId])
+}
+
+model Flag {
+  id         String     @id @default(cuid())
+  type       FlagType
+  userId     String
+  sessionId  String?
+  taskId     String?
+  gitEventId String?
+  detail     String
+  status     FlagStatus @default(open)
+  createdAt  DateTime   @default(now())
+  resolvedAt DateTime?
+
+  @@index([userId, status])
+}
+
+model Question {
+  id           String         @id @default(cuid())
+  adminUserId  String
+  targetUserId String
+  taskId       String
+  sessionId    String?
+  body         String
+  blocksNext   Boolean        @default(true) // gates the dev's next task completion
+  status       QuestionStatus @default(open)
+  answer       String?
+  createdAt    DateTime       @default(now())
+  answeredAt   DateTime?
+
+  @@index([targetUserId, status])
+}
