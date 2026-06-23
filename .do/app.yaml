@@ -35,6 +35,7 @@ services:
       - { key: NODE_ENV, value: production, scope: RUN_TIME }
       - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
       - { key: APP_BASE_URL, value: ${APP_URL}, scope: RUN_TIME }
+      - { key: ADMIN_GITHUB_LOGINS, value: chordsnstrings, scope: RUN_TIME }
       - { key: SESSION_SECRET, scope: RUN_TIME, type: SECRET }
       - { key: GITHUB_APP_ID, scope: RUN_AND_BUILD_TIME, type: SECRET }
       - { key: GITHUB_APP_PRIVATE_KEY, scope: RUN_TIME, type: SECRET }

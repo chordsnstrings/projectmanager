@@ -20,6 +20,12 @@ export const env = {
   GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET ?? '',
   GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET ?? '',
 
+  // Bootstrap admins: comma-separated GitHub logins promoted to `admin` on sign-in.
+  ADMIN_GITHUB_LOGINS: (process.env.ADMIN_GITHUB_LOGINS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+
   // Tunables (§6/§11)
   IDLE_MINUTES: num('IDLE_MINUTES', 90),
   MAX_OPEN_HOURS: num('MAX_OPEN_HOURS', 8),

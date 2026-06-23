@@ -48,6 +48,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const emails = await fetchUserEmails(token);
       const primary = emails.find((e) => e.primary)?.email ?? gh.email ?? null;
 
+      const isBootstrapAdmin = env.ADMIN_GITHUB_LOGINS.includes(gh.login.toLowerCase());
       const user = await prisma.user.upsert({
         where: { githubId: BigInt(gh.id) },
         create: {
@@ -56,6 +57,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           name: gh.name,
           email: primary,
           avatarUrl: gh.avatar_url,
+          role: isBootstrapAdmin ? 'admin' : 'dev',
         },
         update: {
           githubLogin: gh.login,
@@ -63,6 +65,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           email: primary,
           avatarUrl: gh.avatar_url,
           deletedAt: null,
+          // Promote bootstrap admins; never auto-demote anyone else here.
+          ...(isBootstrapAdmin ? { role: 'admin' } : {}),
         },
       });
 
