@@ -13,6 +13,7 @@ import type {
 } from '@cadence/shared';
 import { sumMinutes, unionMinutes, type Interval } from '../engine/sessionMath';
 import { taskOrigin } from './map';
+import { localDayRange, localToday, resolveTz } from '../lib/tz';
 
 function median(xs: number[]): number | null {
   if (xs.length === 0) return null;
@@ -99,11 +100,12 @@ export async function buildTeamDashboard(
   };
 }
 
-export async function buildDayTimeline(userId: string, date: string): Promise<DayTimeline> {
-  const dayStart = new Date(`${date}T00:00:00.000Z`);
-  const dayEnd = new Date(`${date}T23:59:59.999Z`);
+export async function buildDayTimeline(userId: string, dateArg?: string): Promise<DayTimeline> {
   const now = Date.now();
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const tz = resolveTz(user.timezone);
+  const date = dateArg || localToday(tz);
+  const { start: dayStart, end: dayEnd } = localDayRange(date, tz);
 
   const sessions = await prisma.session.findMany({
     where: {
@@ -230,6 +232,7 @@ export async function buildDayTimeline(userId: string, date: string): Promise<Da
     userId,
     githubLogin: user.githubLogin,
     date,
+    timezone: tz,
     dayStart: dayStart.toISOString(),
     dayEnd: dayEnd.toISOString(),
     activeElapsedMinutes: unionMinutes(allIntervals),

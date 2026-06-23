@@ -13,6 +13,8 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 export interface LaneProps {
   lane: TimelineLane;
   window: TimeWindow;
+  /** IANA tz the day is expressed in (axis labels + bar tooltips) */
+  tz?: string;
   flaggedIds: Set<string>;
   selectedId: string | null;
   onSelect: (session: TimelineSession) => void;
@@ -34,8 +36,8 @@ function Variance({ minutes }: { minutes: number | null }) {
   );
 }
 
-export default function Lane({ lane, window: w, flaggedIds, selectedId, onSelect, onSelectLane, onAskLane }: LaneProps) {
-  const ticks = hourTicks(w);
+export default function Lane({ lane, window: w, tz, flaggedIds, selectedId, onSelect, onSelectLane, onAskLane }: LaneProps) {
+  const ticks = hourTicks(w, tz);
   const canAsk = lane.taskId != null; // off-task lanes have no task to ask about
   return (
     <div className="flex items-stretch border-b border-hair last:border-b-0 hover:bg-surface/20 transition-colors">
@@ -102,6 +104,7 @@ export default function Lane({ lane, window: w, flaggedIds, selectedId, onSelect
               key={s.id}
               session={s}
               window={w}
+              tz={tz}
               flaggedIds={flaggedIds}
               selected={s.id === selectedId}
               onSelect={onSelect}

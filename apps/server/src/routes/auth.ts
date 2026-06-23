@@ -120,18 +120,28 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       avatarUrl: user.avatarUrl,
       role: user.role,
       stopOnCommit: user.stopOnCommit,
+      timezone: user.timezone,
     };
     return me;
   });
 
-  // Per-user settings (e.g. auto-stop a task's session when a commit lands).
-  app.patch<{ Body: { stopOnCommit?: boolean } }>('/me/settings', async (req, reply) => {
+  // Per-user settings (auto-stop on commit; IANA timezone for local day/idle/digests).
+  app.patch<{ Body: { stopOnCommit?: boolean; timezone?: string } }>('/me/settings', async (req, reply) => {
     const userId = getSessionUserId(req);
     if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
-    const data: { stopOnCommit?: boolean } = {};
+    const data: { stopOnCommit?: boolean; timezone?: string } = {};
     if (typeof req.body?.stopOnCommit === 'boolean') data.stopOnCommit = req.body.stopOnCommit;
+    if (typeof req.body?.timezone === 'string') {
+      // validate it's a real IANA zone before persisting
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: req.body.timezone });
+        data.timezone = req.body.timezone;
+      } catch {
+        return reply.code(400).send({ error: 'invalid_timezone' });
+      }
+    }
     const user = await prisma.user.update({ where: { id: userId }, data });
-    return { stopOnCommit: user.stopOnCommit };
+    return { stopOnCommit: user.stopOnCommit, timezone: user.timezone };
   });
 
   // ── Email aliases (confirm screen, §4) ────────────────────────────────────

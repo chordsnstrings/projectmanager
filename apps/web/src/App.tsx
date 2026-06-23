@@ -66,7 +66,17 @@ export default function App() {
 
   useEffect(() => {
     api<Me>('/me')
-      .then((me) => setAuth({ kind: 'authed', me }))
+      .then((me) => {
+        setAuth({ kind: 'authed', me });
+        // Keep the server's notion of the user's timezone in sync with the
+        // browser so day boundaries, idle math and digests are in local time.
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (browserTz && browserTz !== me.timezone) {
+          void api('/me/settings', { method: 'PATCH', body: JSON.stringify({ timezone: browserTz }) }).catch(
+            () => {},
+          );
+        }
+      })
       .catch(() => setAuth({ kind: 'anon' }));
   }, []);
 
@@ -355,11 +365,15 @@ function DevApp({ me }: { me: Me }) {
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
-const todayStr = () => new Date().toISOString().slice(0, 10);
+// Local calendar date (not UTC) — "today" should match the viewer's wall clock.
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 function shiftDate(d: string, delta: number): string {
-  const dt = new Date(`${d}T00:00:00Z`);
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().slice(0, 10);
+  const [y, m, day] = d.split('-').map(Number);
+  const dt = new Date(y!, (m! - 1), day! + delta);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
 type AdminTab = 'team' | 'flags' | 'questions';

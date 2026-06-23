@@ -37,17 +37,34 @@ export function barGeom(
   return { left, width: Math.max(0.4, endPct - left) };
 }
 
-/** Hour tick marks (as percentages) for the axis, one per whole hour in range. */
-export function hourTicks(w: TimeWindow): { label: string; left: number }[] {
+/**
+ * Hour tick marks (as percentages) for the axis. When `tz` is given, labels are
+ * the hour in that zone (the window already spans that zone's local midnight),
+ * so an admin reads a dev's day in the dev's local hours.
+ */
+export function hourTicks(w: TimeWindow, tz?: string): { label: string; left: number }[] {
   const ticks: { label: string; left: number }[] = [];
-  const start = new Date(w.startMs);
-  const first = new Date(start);
+  const hourFmt =
+    tz != null
+      ? (() => {
+          try {
+            return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false });
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+  const first = new Date(w.startMs);
   first.setMinutes(0, 0, 0);
   if (first.getTime() < w.startMs) first.setHours(first.getHours() + 1);
   for (let t = first.getTime(); t <= w.endMs; t += 3_600_000) {
     const d = new Date(t);
     const left = ((t - w.startMs) / (w.endMs - w.startMs)) * 100;
-    ticks.push({ label: String(d.getHours()).padStart(2, '0'), left });
+    const label = hourFmt
+      ? hourFmt.formatToParts(d).find((p) => p.type === 'hour')?.value.padStart(2, '0') ??
+        String(d.getHours()).padStart(2, '0')
+      : String(d.getHours()).padStart(2, '0');
+    ticks.push({ label, left });
   }
   return ticks;
 }

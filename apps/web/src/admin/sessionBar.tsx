@@ -6,13 +6,14 @@ import { barGeom, pct, type TimeWindow } from './timeScale';
 export interface SessionBarProps {
   session: TimelineSession;
   window: TimeWindow;
+  tz?: string;
   /** flag ids on this session that are unresolved → render danger markers */
   flaggedIds: Set<string>;
   selected: boolean;
   onSelect: (session: TimelineSession) => void;
 }
 
-export default function SessionBar({ session, window: w, flaggedIds, selected, onSelect }: SessionBarProps) {
+export default function SessionBar({ session, window: w, tz, flaggedIds, selected, onSelect }: SessionBarProps) {
   const { left, width } = barGeom(session.startedAt, session.endedAt, w);
   const hasFlag = session.flagIds.some((id) => flaggedIds.has(id));
 
@@ -22,7 +23,7 @@ export default function SessionBar({ session, window: w, flaggedIds, selected, o
       <button
         type="button"
         aria-pressed={selected}
-        aria-label={`session ${fmtClock(session.startedAt)} to ${session.endedAt ? fmtClock(session.endedAt) : 'now'}`}
+        aria-label={`session ${fmtClock(session.startedAt, tz)} to ${session.endedAt ? fmtClock(session.endedAt, tz) : 'now'}`}
         onClick={() => onSelect(session)}
         className={`relative block h-full w-full rounded-md overflow-hidden border cursor-pointer transition-[filter,box-shadow] hover:brightness-125 ${
           selected ? 'ring-2 ring-brass ring-offset-1 ring-offset-panel' : session.isOpen ? 'border-success/50' : 'border-hair2'

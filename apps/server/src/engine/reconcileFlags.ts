@@ -5,6 +5,7 @@ import { env } from '../env';
 import { longOpenSession, openNoActivity, overrun, type FlagCandidate } from './flags';
 import { sumMinutes } from './sessionMath';
 import { dominantActivity } from './activity';
+import { localToday, resolveTz, startOfLocalDay } from '../lib/tz';
 
 /**
  * Generate one inferred ActivitySegment per recent session that has commits but
@@ -95,15 +96,22 @@ export async function autoStopOnCommit(db: Db, _now = Date.now()): Promise<numbe
  * dashboard doesn't accumulate stale "running" sessions across days.
  */
 export async function autoCloseStaleDays(db: Db, now = Date.now()): Promise<number> {
-  const d = new Date(now);
-  const todayStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const stale = await db.session.findMany({
-    where: { isOpen: true, deletedAt: null, startedAt: { lt: todayStart } },
+  // Close sessions a dev forgot to stop overnight — judged against *their own*
+  // local midnight, so working past UTC midnight isn't cut off mid-flow.
+  const open = await db.session.findMany({
+    where: { isOpen: true, deletedAt: null },
+    include: { user: { select: { timezone: true } } },
   });
-  for (const s of stale) {
-    await db.session.update({ where: { id: s.id }, data: { isOpen: false, endedAt: todayStart } });
+  let closed = 0;
+  for (const s of open) {
+    const tz = resolveTz(s.user.timezone);
+    const todayStart = startOfLocalDay(localToday(tz, new Date(now)), tz);
+    if (s.startedAt < todayStart) {
+      await db.session.update({ where: { id: s.id }, data: { isOpen: false, endedAt: todayStart } });
+      closed++;
+    }
   }
-  return stale.length;
+  return closed;
 }
 
 export interface ReconcileResult {

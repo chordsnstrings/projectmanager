@@ -45,6 +45,7 @@ export interface Me {
   avatarUrl: string | null;
   role: Role;
   stopOnCommit: boolean;
+  timezone: string | null;
 }
 
 /** Generic paginated envelope — every list endpoint uses this (§2). */
@@ -247,7 +248,8 @@ export interface TimelineSession {
 export interface DayTimeline {
   userId: string;
   githubLogin: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (the user's local calendar day)
+  timezone: string; // IANA tz the day boundaries + times are expressed in
   dayStart: string;
   dayEnd: string;
   activeElapsedMinutes: number;

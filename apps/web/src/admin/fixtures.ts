@@ -167,6 +167,7 @@ export const dayTimelineFixture: DayTimeline = {
   userId: 'u-1',
   githubLogin: 'octocat',
   date: base.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
+  timezone: 'UTC',
   dayStart: at(-30 * M),
   dayEnd: at(5 * H + 30 * M),
   activeElapsedMinutes: 230,

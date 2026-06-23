@@ -17,6 +17,7 @@ function activityBreakdown(session: TimelineSession): { type: string; minutes: n
 export default function SessionDetail({
   session,
   laneTitle,
+  tz,
   onClose,
   onAsk,
   canAsk = false,
@@ -25,6 +26,7 @@ export default function SessionDetail({
 }: {
   session: TimelineSession;
   laneTitle: string;
+  tz?: string;
   onClose: () => void;
   /** raise a question pinned to this session/task (gates the dev's next completion) */
   onAsk?: (body: string) => void;
@@ -43,7 +45,7 @@ export default function SessionDetail({
         <div className="min-w-0">
           <span className="text-sm text-text truncate font-medium tracking-tightish">{laneTitle}</span>
           <span className="ml-2 font-mono text-xs text-text2">
-            {fmtClock(session.startedAt)}–{session.endedAt ? fmtClock(session.endedAt) : 'now'}
+            {fmtClock(session.startedAt, tz)}–{session.endedAt ? fmtClock(session.endedAt, tz) : 'now'}
           </span>
           {session.isOpen && (
             <span className="ml-2 inline-flex items-center gap-1 font-mono text-[10px] text-success">
@@ -135,7 +137,7 @@ export default function SessionDetail({
           <ul className="space-y-0.5 sm:border-l sm:border-hair sm:pl-3">
             {session.commits.map((c) => (
               <li key={c.sha} className="font-mono text-[11px] text-text2 flex gap-2">
-                <span className="text-text3">{fmtClock(c.occurredAt)}</span>
+                <span className="text-text3">{fmtClock(c.occurredAt, tz)}</span>
                 <span>{c.sha.slice(0, 7)}</span>
                 <span className="truncate">{c.message}</span>
               </li>

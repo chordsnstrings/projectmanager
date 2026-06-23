@@ -67,8 +67,9 @@ function concurrentBands(
 }
 
 export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
+  const tz = data.timezone;
   const w = makeWindow(data.dayStart, data.dayEnd);
-  const ticks = hourTicks(w);
+  const ticks = hourTicks(w, tz);
   const bands = concurrentBands(data, w);
   const [selected, setSelected] = useState<TimelineSession | null>(null);
   const [autoAsk, setAutoAsk] = useState(false);
@@ -160,6 +161,7 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
                   key={lane.taskId ?? lane.title}
                   lane={lane}
                   window={w}
+                  tz={tz}
                   flaggedIds={flaggedIds}
                   selectedId={selected?.id ?? null}
                   onSelect={(s) => {
@@ -181,6 +183,7 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
           key={`${selected.id}${autoAsk ? '-ask' : ''}`}
           session={selected}
           laneTitle={selectedLaneTitle}
+          tz={tz}
           autoAsk={autoAsk && Boolean(selectedTaskId)}
           onClose={() => {
             setSelected(null);

@@ -75,6 +75,7 @@ model User {
   avatarUrl   String?
   role        Role        @default(dev)
   stopOnCommit Boolean    @default(false) // auto-close a task's open session when a commit lands
+  timezone    String?     // IANA tz id (e.g. "Asia/Karachi"); day boundaries, idle + digests use the user's local time
   githubAccessToken String? // OAuth token, AES-256-GCM encrypted at rest (per-user sync)
   emails      UserEmail[]
   sessions    Session[]

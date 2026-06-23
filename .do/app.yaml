@@ -81,7 +81,7 @@ jobs:
   - name: digest
     kind: SCHEDULED
     schedule:
-      cron: "0 6 * * *" # daily 06:00 UTC team digest + per-dev nudges
+      cron: "0 * * * *" # hourly; each recipient is mailed at DIGEST_HOUR in their own timezone
     github:
       repo: chordsnstrings/projectmanager
       branch: main

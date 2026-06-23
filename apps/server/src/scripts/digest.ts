@@ -1,9 +1,11 @@
 /**
- * Email digests (SCHEDULED daily, §10-adjacent). Sends:
- *  - one admin team digest (yesterday's rollup) to every admin with an email +
- *    any DIGEST_TO addresses, and
+ * Email digests. The job runs hourly (SCHEDULED) and delivers to each recipient
+ * at DIGEST_HOUR in *their own* timezone:
+ *  - an admin team digest (their local yesterday's rollup) to every admin with
+ *    an email; plus any DIGEST_TO addresses (at DEFAULT_TZ), and
  *  - a per-dev "open items" nudge to each dev with open flags or open questions.
  *
+ * On-demand sends (the admin "Send digest now" button) bypass the hour gate.
  * No-ops cleanly when SMTP isn't configured. Usage:
  *   node apps/server/dist/scripts/digest.js
  */
@@ -12,52 +14,68 @@ import { mailConfigured, sendMail } from '../email/mailer';
 import { buildTeamDashboard } from '../services/dashboard';
 import { renderAdminDigest, renderDevDigest, type DevDigestData } from '../email/digest';
 import { env } from '../env';
+import { DEFAULT_TZ, addDays, localHour, localToday, resolveTz, startOfLocalDay } from '../lib/tz';
 
-export interface DigestResult {
-  adminRecipients: number;
-  devsSent: number;
-  skipped?: string;
+const DIGEST_HOUR = Number(process.env.DIGEST_HOUR ?? 7); // local hour to deliver
+
+/** Yesterday's [start, end) UTC instants for the local calendar, in tz. */
+function yesterdayRange(tz: string, now = new Date()): { start: Date; end: Date; label: string } {
+  const z = resolveTz(tz);
+  const today = localToday(z, now);
+  const label = addDays(today, -1);
+  return { start: startOfLocalDay(label, z), end: startOfLocalDay(today, z), label };
 }
 
-/** Yesterday in UTC: [midnight-prev, midnight-today). */
-function yesterdayRange(now = new Date()): { start: Date; end: Date; label: string } {
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const start = new Date(end.getTime() - 86_400_000);
-  return { start, end, label: start.toISOString().slice(0, 10) };
-}
-
-/** Send the admin team digest. Returns the recipient count (0 if none/SMTP off). */
-export async function sendAdminDigest(range = yesterdayRange()): Promise<number> {
-  if (!mailConfigured()) return 0;
-  const admins = await prisma.user.findMany({
-    where: { role: 'admin', deletedAt: null, email: { not: null } },
-    select: { email: true },
-  });
-  const recipients = new Set<string>();
-  for (const a of admins) if (a.email) recipients.add(a.email);
-  for (const e of env.DIGEST_TO) recipients.add(e);
-  if (recipients.size === 0) return 0;
-
+/** Build + send one admin team digest (that recipient's local yesterday) to `to`. */
+async function sendAdminDigestTo(to: string[], tz: string): Promise<void> {
+  const range = yesterdayRange(tz);
   const dash = await buildTeamDashboard(range.start, range.end);
   const [openFlags, openQuestions] = await Promise.all([
     prisma.flag.count({ where: { status: 'open' } }),
     prisma.question.count({ where: { status: 'open' } }),
   ]);
   const mail = renderAdminDigest(dash, { dateLabel: range.label, openFlags, openQuestions });
-  await sendMail({ to: [...recipients], ...mail });
-  return recipients.size;
+  await sendMail({ to, ...mail });
 }
 
-/** Send per-dev nudges. Returns how many devs were emailed. */
-export async function sendDevDigests(): Promise<number> {
+/**
+ * Send admin team digests. When `respectSchedule`, only recipients whose local
+ * hour == DIGEST_HOUR get one; otherwise (on-demand) everyone does. Returns the
+ * number of emails sent.
+ */
+export async function sendAdminDigest(respectSchedule = false, now = new Date()): Promise<number> {
+  if (!mailConfigured()) return 0;
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin', deletedAt: null, email: { not: null } },
+    select: { email: true, timezone: true },
+  });
+  let sent = 0;
+  for (const a of admins) {
+    if (!a.email) continue;
+    const tz = resolveTz(a.timezone);
+    if (respectSchedule && localHour(now, tz) !== DIGEST_HOUR) continue;
+    await sendAdminDigestTo([a.email], tz);
+    sent++;
+  }
+  // Fixed DIGEST_TO addresses (no user/tz): deliver once, at DEFAULT_TZ.
+  if (env.DIGEST_TO.length > 0 && (!respectSchedule || localHour(now, DEFAULT_TZ) === DIGEST_HOUR)) {
+    await sendAdminDigestTo(env.DIGEST_TO, DEFAULT_TZ);
+    sent++;
+  }
+  return sent;
+}
+
+/** Send per-dev nudges. Honors the local-hour gate when `respectSchedule`. */
+export async function sendDevDigests(respectSchedule = false, now = new Date()): Promise<number> {
   if (!mailConfigured()) return 0;
   const devs = await prisma.user.findMany({
     where: { role: 'dev', deletedAt: null, email: { not: null } },
-    select: { id: true, email: true, name: true, githubLogin: true },
+    select: { id: true, email: true, name: true, githubLogin: true, timezone: true },
   });
   let sent = 0;
   for (const d of devs) {
     if (!d.email) continue;
+    if (respectSchedule && localHour(now, resolveTz(d.timezone)) !== DIGEST_HOUR) continue;
     const [flags, questions] = await Promise.all([
       prisma.flag.findMany({
         where: { userId: d.id, status: 'open' },
@@ -92,11 +110,12 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ job: 'digest', skipped: 'smtp_not_configured' }));
     return;
   }
-  const adminRecipients = await sendAdminDigest();
-  const devsSent = await sendDevDigests();
+  const adminRecipients = await sendAdminDigest(true);
+  const devsSent = await sendDevDigests(true);
   console.log(
     JSON.stringify({
       job: 'digest',
+      digestHour: DIGEST_HOUR,
       adminRecipients,
       devsSent,
       ms: Date.now() - startedAt,

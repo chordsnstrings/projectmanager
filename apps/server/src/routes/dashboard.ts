@@ -31,8 +31,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
       const user = await requireUser(req, reply);
       if (!user) return;
       if (!canViewUser(user, req.params.id, reply)) return;
-      const date = req.query.date ?? new Date().toISOString().slice(0, 10);
-      return buildDayTimeline(req.params.id, date);
+      return buildDayTimeline(req.params.id, req.query.date);
     },
   );
 

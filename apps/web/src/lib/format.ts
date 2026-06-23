@@ -11,10 +11,26 @@ export function fmtDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-/** ISO → "HH:MM" (24h, zero-padded). */
-export function fmtClock(iso: string): string {
+/**
+ * ISO → "HH:MM" (24h, zero-padded). When `tz` (IANA) is given the time is shown
+ * in that zone, so an admin sees a dev's day in the dev's own local time rather
+ * than the admin's browser time.
+ */
+export function fmtClock(iso: string, tz?: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '--:--';
+  if (tz) {
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(d);
+    } catch {
+      /* fall through to browser-local */
+    }
+  }
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
   return `${hh}:${mm}`;
