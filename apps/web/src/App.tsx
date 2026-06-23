@@ -88,7 +88,7 @@ export default function App() {
     if (auth.kind !== 'authed') return;
     const p = route.path;
     if (auth.me.role === 'dev') {
-      if (p !== '/board') route.navigate('/board', true);
+      if (!p.startsWith('/board')) route.navigate('/board', true);
     } else if (!p.startsWith('/admin')) {
       route.navigate('/admin/team', true);
     }
@@ -96,7 +96,7 @@ export default function App() {
 
   if (auth.kind === 'loading') return <Splash>connecting…</Splash>;
   if (auth.kind === 'anon') return <SignIn />;
-  return auth.me.role === 'admin' ? <AdminApp me={auth.me} route={route} /> : <DevApp me={auth.me} />;
+  return auth.me.role === 'admin' ? <AdminApp me={auth.me} route={route} /> : <DevApp me={auth.me} route={route} />;
 }
 
 // ── Chrome ──────────────────────────────────────────────────────────────────
@@ -143,12 +143,21 @@ function SignIn() {
 }
 
 // ── Programmer ────────────────────────────────────────────────────────────────
-function DevApp({ me }: { me: Me }) {
+function DevApp({ me, route }: { me: Me; route: Route }) {
+  const { path, params, navigate } = route;
+  const view: 'board' | 'day' = path.startsWith('/board/day') ? 'day' : 'board';
+  const dayDate = params.get('date') ?? todayStr();
+  const setDayDate: React.Dispatch<React.SetStateAction<string>> = (upd) => {
+    const next = typeof upd === 'function' ? (upd as (d: string) => string)(dayDate) : upd;
+    navigate(`/board/day${next === todayStr() ? '' : `?date=${next}`}`);
+  };
+
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [active, setActive] = useState<SessionDTO[]>([]);
   const [nudges, setNudges] = useState<NudgeDTO[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
+  const [day, setDay] = useState<DayTimelineDTO | null>(null);
   const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -194,6 +203,19 @@ function DevApp({ me }: { me: Me }) {
     const id = setInterval(refresh, 15000); // near-live for questions
     return () => clearInterval(id);
   }, [doSync, refresh]);
+
+  // "My day": the dev's own timeline (live today, or any past day) for self-review.
+  const loadDay = useCallback(
+    () => api<DayTimelineDTO>(`/dashboard/user/${me.id}/day?date=${dayDate}`).then(setDay).catch(() => setDay(null)),
+    [me.id, dayDate],
+  );
+  useEffect(() => {
+    if (view !== 'day') return;
+    void loadDay();
+    if (dayDate !== todayStr()) return;
+    const id = setInterval(loadDay, 30000); // keep today's view current
+    return () => clearInterval(id);
+  }, [view, loadDay, dayDate]);
 
   // Live "stop on commit": while a task session is running, poll just that repo
   // for new commits (no webhooks needed) and auto-stop within ~30s.
@@ -328,6 +350,37 @@ function DevApp({ me }: { me: Me }) {
 
   if (!loaded) return <Splash>loading your board…</Splash>;
 
+  // "My day" — read-only self-review timeline.
+  if (view === 'day') {
+    return (
+      <Shell>
+        <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo size={20} />
+            <button onClick={() => navigate('/board')} className="btn btn-sm btn-ghost">← board</button>
+          </div>
+          <button onClick={signOut} className="btn btn-sm btn-ghost">sign out</button>
+        </header>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-sm font-semibold text-text tracking-tightish mr-1">My day</h1>
+            <DateNav date={dayDate} setDate={setDayDate} />
+          </div>
+          {day ? (
+            <>
+              <DayTimeline data={day} />
+              <p className="text-center font-mono text-[11px] text-text3">
+                active = real time worked (overlaps counted once) · task hrs = effort across tasks
+              </p>
+            </>
+          ) : (
+            <Loading>loading your day…</Loading>
+          )}
+        </div>
+      </Shell>
+    );
+  }
+
   const sessionsByTask: Record<string, TaskSessionState> = {};
   for (const s of active) if (s.taskId) sessionsByTask[s.taskId] = { state: 'running', session: s };
 
@@ -337,6 +390,7 @@ function DevApp({ me }: { me: Me }) {
   return (
     <Shell>
       <ProgrammerScreen
+        onOpenDay={() => navigate('/board/day')}
         login={me.githubLogin}
         syncedAgo={syncedAgo}
         syncing={syncing}

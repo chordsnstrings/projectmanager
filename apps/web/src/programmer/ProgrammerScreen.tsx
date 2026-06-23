@@ -56,6 +56,8 @@ export interface ProgrammerScreenProps {
   onBackfill?: (label: string, startedAt: string, endedAt: string) => void;
   stopOnCommit?: boolean;
   onToggleStopOnCommit?: () => void;
+  /** open the dev's own day-timeline (self-review) */
+  onOpenDay?: () => void;
 }
 
 function RunningTimer({ startedAt }: { startedAt: string }) {
@@ -95,6 +97,7 @@ export default function ProgrammerScreen({
   onBackfill = noop,
   stopOnCommit = false,
   onToggleStopOnCommit = noop,
+  onOpenDay = noop,
 }: ProgrammerScreenProps) {
   return (
     <div className="min-h-full text-text font-sans">
@@ -105,6 +108,9 @@ export default function ProgrammerScreen({
           <span className="hidden sm:inline text-sm font-medium text-text2 tracking-tightish truncate">{date}</span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <button type="button" onClick={() => onOpenDay()} className="btn btn-sm btn-ghost" title="review your day timeline">
+            My day
+          </button>
           <span className="inline-flex items-center gap-1.5 font-mono text-xs text-text2 px-2.5 h-8 rounded-lg border border-hair">
             <span className="w-1.5 h-1.5 rounded-full bg-success" aria-hidden />
             <span className="hidden sm:inline text-text3">github · </span>{login}
