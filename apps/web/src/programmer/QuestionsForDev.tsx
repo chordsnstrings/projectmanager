@@ -65,11 +65,26 @@ export default function QuestionsForDev({
 }) {
   const open = questions.filter((q) => q.status === 'open');
   if (open.length === 0) return null;
+  const blocking = open.some((q) => q.blocksNext);
 
   return (
-    <section className="rounded-xl border border-brass/30 bg-brass/[0.06] p-4 sm:p-5 flex flex-col gap-3.5 animate-fade-in">
+    <section
+      className={`relative rounded-xl border p-4 sm:p-5 flex flex-col gap-3.5 animate-fade-in shadow-glow-brass ${
+        blocking ? 'border-danger/45 bg-danger/[0.07]' : 'border-brass/40 bg-brass/[0.08]'
+      }`}
+    >
+      {/* pulsing attention indicator on the top-left edge */}
+      <span
+        className={`absolute -top-1.5 -left-1.5 flex h-3.5 w-3.5 ${blocking ? 'text-danger' : 'text-brass'}`}
+        aria-hidden
+      >
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-60" />
+        <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-current" />
+      </span>
       <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-semibold text-brass tracking-tightish">Questions to answer</h2>
+        <h2 className={`text-sm font-semibold tracking-tightish ${blocking ? 'text-danger' : 'text-brass'}`}>
+          {open.length === 1 ? 'A question needs your answer' : `${open.length} questions need your answer`}
+        </h2>
         <p className="text-xs text-text2">Answer to unblock completing your next task.</p>
       </div>
       <ul className="flex flex-col gap-2.5">

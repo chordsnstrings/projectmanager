@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ActivityType,
   DayTimeline as DayTimelineDTO,
@@ -197,6 +197,15 @@ function DevApp({ me }: { me: Me }) {
       clearInterval(id);
     };
   }, [watchCommits, refresh]);
+
+  // Make a newly-arrived question impossible to miss: jump to it + flag the tab.
+  const prevQids = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const hasNew = questions.some((q) => !prevQids.current.has(q.id));
+    prevQids.current = new Set(questions.map((q) => q.id));
+    if (hasNew) window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.title = questions.length > 0 ? `(${questions.length}) Cadence · question` : 'Cadence';
+  }, [questions]);
 
   const onStart = useCallback(
     async (taskId: string) => {
