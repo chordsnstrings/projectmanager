@@ -20,9 +20,9 @@ function HeaderCard({
   tone?: string;
 }) {
   return (
-    <div className="rounded border border-hair bg-surface px-3 py-2 min-w-[96px]">
-      <div className="font-mono text-[10px] uppercase tracking-wide text-text3">{label}</div>
-      <div className={`font-mono text-base ${tone}`}>{value}</div>
+    <div className="rounded-lg border border-hair bg-surface/70 px-3 py-2 min-w-[92px]">
+      <div className="label">{label}</div>
+      <div className={`font-mono text-base mt-0.5 ${tone}`}>{value}</div>
     </div>
   );
 }
@@ -81,10 +81,10 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
   );
 
   return (
-    <section className="rounded-lg border border-hair bg-panel overflow-hidden">
-      <header className="px-4 py-3 border-b border-hair flex items-center justify-between gap-4 flex-wrap">
+    <section className="card overflow-hidden animate-fade-in">
+      <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-sm font-medium text-text">{data.githubLogin}</h2>
+          <h2 className="text-sm font-semibold text-text tracking-tightish">{data.githubLogin}</h2>
           <span className="font-mono text-xs text-text3">{data.date}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -104,8 +104,8 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
         <div className="min-w-[640px]">
           {/* Axis */}
           <div className="flex items-stretch border-b border-hair bg-bg/40">
-            <div className="w-40 sm:w-56 shrink-0 border-r border-hair px-4 py-1.5">
-              <span className="font-mono text-[10px] uppercase tracking-wide text-text3">task</span>
+            <div className="w-40 sm:w-56 shrink-0 border-r border-hair px-4 py-2">
+              <span className="label">task</span>
             </div>
             <div className="relative flex-1 min-w-0 py-1.5 px-2 h-7">
               {ticks.map((t) => (
@@ -139,7 +139,7 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
             </div>
 
             {data.lanes.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-text3">No sessions this day.</div>
+              <div className="px-4 py-12 text-center text-sm text-text3">No sessions this day.</div>
             ) : (
               data.lanes.map((lane) => (
                 <Lane
@@ -179,7 +179,7 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
         swipe the timeline horizontally · tap a bar for detail
       </p>
 
-      <footer className="px-4 py-2 border-t border-hair flex items-center gap-4 flex-wrap font-mono text-[10px] text-text3">
+      <footer className="px-4 sm:px-5 py-2.5 border-t border-hair flex items-center gap-5 flex-wrap font-mono text-[10px] text-text3">
         <span className="inline-flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-text" aria-hidden /> commit
         </span>

@@ -35,15 +35,15 @@ export default function AddActivity({
   };
 
   return (
-    <div className="mt-4">
+    <div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[11px] text-text3 mr-1">+ log time</span>
+        <span className="label mr-1">+ log time</span>
         {OFF_TASK_LABELS.map((l) => (
           <button
             key={l}
             type="button"
             onClick={() => onStartLabeled(l)}
-            className="font-mono text-xs px-2.5 h-8 rounded-full border border-hair text-text2 hover:text-text hover:border-hair2"
+            className="chip"
             title={`start a ${l} session now`}
           >
             {l}
@@ -52,20 +52,20 @@ export default function AddActivity({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="font-mono text-xs px-2.5 h-8 rounded-full border border-dashed border-hair2 text-text3 hover:text-text2"
+          className="chip border-dashed border-hair2 text-text3"
         >
           backfill…
         </button>
       </div>
 
       {open && (
-        <div className="mt-3 rounded-lg border border-hair bg-panel p-3 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-wide text-text3">activity</span>
+        <div className="mt-3 card p-4 flex flex-wrap items-end gap-3 animate-fade-in">
+          <label className="flex flex-col gap-1.5">
+            <span className="label">activity</span>
             <select
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="font-mono text-xs bg-surface border border-hair rounded px-2 h-9 text-text [color-scheme:dark]"
+              className="field font-mono text-xs px-2.5 h-9 [color-scheme:dark]"
             >
               {OFF_TASK_LABELS.map((l) => (
                 <option key={l} value={l}>
@@ -74,32 +74,32 @@ export default function AddActivity({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-wide text-text3">from</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="label">from</span>
             <input
               type="time"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="font-mono text-xs bg-surface border border-hair rounded px-2 h-9 text-text [color-scheme:dark]"
+              className="field font-mono text-xs px-2.5 h-9 [color-scheme:dark]"
             />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-wide text-text3">to</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="label">to</span>
             <input
               type="time"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="font-mono text-xs bg-surface border border-hair rounded px-2 h-9 text-text [color-scheme:dark]"
+              className="field font-mono text-xs px-2.5 h-9 [color-scheme:dark]"
             />
           </label>
           <button
             type="button"
             onClick={submit}
-            className="font-mono text-xs px-3 h-9 rounded bg-brass text-bg font-medium hover:opacity-90"
+            className="btn btn-md btn-primary"
           >
             add to today
           </button>
-          {err && <span className="font-mono text-[11px] text-danger">{err}</span>}
+          {err && <span className="font-mono text-[11px] text-danger self-center">{err}</span>}
         </div>
       )}
     </div>

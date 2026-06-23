@@ -49,8 +49,8 @@ function Stat({
   tone?: string;
 }) {
   return (
-    <div className="flex flex-col">
-      <span className="font-mono text-[10px] uppercase tracking-wide text-text3">
+    <div className="flex flex-col gap-0.5">
+      <span className="label">
         {label}
       </span>
       <span className={`font-mono text-sm ${tone}`}>{children}</span>
@@ -60,9 +60,9 @@ function Stat({
 
 export default function TeamOverview({ data, onSelectUser = noop }: TeamOverviewProps) {
   return (
-    <section className="rounded-lg border border-hair bg-panel overflow-hidden">
-      <header className="px-4 py-3 border-b border-hair flex items-center justify-between">
-        <h2 className="text-sm font-medium text-text">Team</h2>
+    <section className="card overflow-hidden animate-fade-in">
+      <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-text tracking-tightish">Team</h2>
         <span className="font-mono text-xs text-text3">
           {fmtClock(data.rangeStart)}–{fmtClock(data.rangeEnd)}
         </span>
@@ -70,20 +70,20 @@ export default function TeamOverview({ data, onSelectUser = noop }: TeamOverview
 
       <div role="table" aria-label="team overview">
         {data.members.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-text3">No activity in range.</div>
+          <div className="px-4 py-12 text-center text-sm text-text3">No activity in range.</div>
         ) : (
           data.members.map((m) => (
             <button
               key={m.userId}
               type="button"
               onClick={() => onSelectUser(m.userId)}
-              className="w-full text-left border-b border-hair last:border-b-0 px-4 py-3 hover:bg-surface/50 focus:outline-none focus:bg-surface/50"
+              className="group w-full text-left border-b border-hair last:border-b-0 px-4 sm:px-5 py-3.5 hover:bg-surface/50 focus:outline-none focus:bg-surface/50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <Avatar member={m} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-sm text-text font-medium truncate">
+                    <span className="text-sm text-text font-medium truncate tracking-tightish group-hover:text-text transition-colors">
                       {m.name ?? m.githubLogin}
                     </span>
                     <span className="font-mono text-xs text-text3 truncate">

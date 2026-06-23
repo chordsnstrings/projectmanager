@@ -48,8 +48,8 @@ function allNull(points: TrendPoint[], pick: (p: TrendPoint) => number | null): 
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-hair bg-panel p-3 flex flex-col gap-2 min-w-0">
-      <h3 className="font-mono text-[10px] uppercase tracking-wide text-text3">{title}</h3>
+    <div className="card p-4 flex flex-col gap-3 min-w-0">
+      <h3 className="label">{title}</h3>
       {children}
     </div>
   );
@@ -378,16 +378,16 @@ export default function Trends({ data }: { data: TrendsData }) {
 
   if (points.length === 0) {
     return (
-      <section className="rounded-lg border border-hair bg-panel p-8 text-center text-sm text-text3">
+      <section className="card p-12 text-center text-sm text-text3 animate-fade-in">
         No trend data yet.
       </section>
     );
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-text">Trends</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+    <section className="flex flex-col gap-4 animate-fade-in">
+      <h2 className="text-sm font-semibold text-text tracking-tightish">Trends</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <Card title="Estimate accuracy">
           <EstimateAccuracyChart points={points} />
         </Card>

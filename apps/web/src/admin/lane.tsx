@@ -33,17 +33,17 @@ function Variance({ minutes }: { minutes: number | null }) {
 export default function Lane({ lane, window: w, flaggedIds, selectedId, onSelect }: LaneProps) {
   const ticks = hourTicks(w);
   return (
-    <div className="flex items-stretch border-b border-hair last:border-b-0">
+    <div className="flex items-stretch border-b border-hair last:border-b-0 hover:bg-surface/20 transition-colors">
       {/* lane label */}
-      <div className="w-40 sm:w-56 shrink-0 px-4 py-3 border-r border-hair">
+      <div className="w-40 sm:w-56 shrink-0 px-4 py-3.5 border-r border-hair">
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-text3">{lane.origin}</span>
           {lane.reopenCount > 0 && (
             <span className="font-mono text-[11px] text-danger/80">↻{lane.reopenCount}</span>
           )}
         </div>
-        <div className="text-sm text-text truncate">{lane.title}</div>
-        <div className="mt-1 flex items-center gap-2 font-mono text-[11px] text-text3 flex-wrap">
+        <div className="text-sm text-text truncate mt-0.5 tracking-tightish">{lane.title}</div>
+        <div className="mt-1.5 flex items-center gap-2 font-mono text-[11px] text-text3 flex-wrap">
           <span>{STATUS_LABEL[lane.status]}</span>
           <span>{fmtDuration(lane.actualMinutes)}</span>
           {lane.estimateMinutes != null && (

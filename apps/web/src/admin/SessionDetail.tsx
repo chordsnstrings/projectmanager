@@ -35,14 +35,18 @@ export default function SessionDetail({
   const [asking, setAsking] = useState(false);
   const [body, setBody] = useState('');
   return (
-    <div className="border-t border-hair2 bg-surface/60 px-4 py-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
+    <div className="border-t border-hair2 bg-surface/50 px-4 sm:px-5 py-4 animate-fade-in">
+      <div className="flex items-center justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <span className="text-sm text-text truncate">{laneTitle}</span>
+          <span className="text-sm text-text truncate font-medium tracking-tightish">{laneTitle}</span>
           <span className="ml-2 font-mono text-xs text-text2">
             {fmtClock(session.startedAt)}–{session.endedAt ? fmtClock(session.endedAt) : 'now'}
           </span>
-          {session.isOpen && <span className="ml-2 font-mono text-[10px] text-success">running</span>}
+          {session.isOpen && (
+            <span className="ml-2 inline-flex items-center gap-1 font-mono text-[10px] text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" aria-hidden />running
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {onAsk && (
@@ -51,7 +55,7 @@ export default function SessionDetail({
               onClick={() => setAsking((a) => !a)}
               disabled={!canAsk}
               title={canAsk ? 'raise a question on this session' : 'off-task sessions have no task to ask about'}
-              className="font-mono text-xs px-2.5 h-8 rounded border border-brass/50 text-brass hover:bg-brass/10 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="btn btn-sm border-brass/40 text-brass hover:bg-brass/10 disabled:hover:bg-transparent"
             >
               ask…
             </button>
@@ -59,7 +63,7 @@ export default function SessionDetail({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 inline-flex items-center justify-center rounded border border-hair text-text3 hover:text-text hover:border-hair2"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-hair text-text3 hover:text-text hover:border-hair2 hover:bg-surface2/60 transition-colors"
             aria-label="close detail"
           >
             ✕
@@ -82,7 +86,7 @@ export default function SessionDetail({
               if (e.key === 'Escape') setAsking(false);
             }}
             placeholder="ask why… (gates their next task completion)"
-            className="flex-1 min-w-0 text-sm bg-surface border border-hair2 rounded px-2.5 h-9 text-text placeholder:text-text3 focus:outline-none"
+            className="field flex-1 min-w-0 text-sm px-3 h-9"
           />
           <button
             type="button"
@@ -93,7 +97,7 @@ export default function SessionDetail({
                 setAsking(false);
               }
             }}
-            className="font-mono text-xs px-3 h-9 rounded bg-brass text-bg font-medium hover:opacity-90"
+            className="btn btn-md btn-primary"
           >
             send
           </button>
@@ -141,11 +145,11 @@ export default function SessionDetail({
       )}
 
       {questions.length > 0 && (
-        <div className="mt-3 border-t border-hair pt-2 space-y-2">
+        <div className="mt-3.5 border-t border-hair pt-3 space-y-2">
           {questions.map((q) => (
-            <div key={q.id} className="rounded border border-brass/30 bg-brass/5 p-2">
+            <div key={q.id} className="rounded-lg border border-brass/30 bg-brass/[0.06] p-2.5">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] text-brass uppercase tracking-wide">question</span>
+                <span className="font-mono text-[10px] text-brass uppercase tracking-[0.08em]">question</span>
                 <span className={`font-mono text-[10px] ${q.status === 'answered' ? 'text-success' : 'text-text3'}`}>
                   {q.status}
                 </span>

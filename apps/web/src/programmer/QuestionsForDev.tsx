@@ -19,16 +19,14 @@ function OpenQuestion({
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded border border-hair bg-surface/40 p-3">
+    <li className="flex flex-col gap-3 rounded-lg border border-hair bg-surface/50 p-3.5">
       <div className="flex items-start gap-2">
         {question.blocksNext ? (
-          <span
-            className="mt-1 inline-flex shrink-0 items-center rounded border border-danger/40 bg-danger/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-danger"
-          >
+          <span className="mt-0.5 tag shrink-0 border-danger/40 bg-danger/10 text-danger">
             blocks next
           </span>
         ) : null}
-        <p className="text-sm text-text break-words">{question.body}</p>
+        <p className="text-sm text-text leading-relaxed break-words">{question.body}</p>
         <span className="ml-auto shrink-0 font-mono text-[11px] text-text3">
           {relativeTime(question.createdAt)}
         </span>
@@ -43,17 +41,13 @@ function OpenQuestion({
             if (e.key === 'Enter') submit();
           }}
           placeholder="Type your answer…"
-          className="min-h-[36px] flex-1 rounded border border-hair bg-surface px-2.5 font-mono text-sm text-text placeholder:text-text3 focus:outline-none focus:border-hair2"
+          className="field min-h-[36px] flex-1 px-3 font-mono text-sm"
         />
         <button
           type="button"
           onClick={submit}
           disabled={text.trim().length === 0}
-          className={`min-h-[36px] inline-flex items-center justify-center rounded border px-3 font-mono text-xs transition-colors focus:outline-none ${
-            text.trim().length === 0
-              ? 'border-hair text-text3 opacity-40 cursor-not-allowed'
-              : 'border-brass/40 bg-brass/10 text-brass hover:bg-brass/20'
-          }`}
+          className="btn btn-md btn-primary disabled:bg-surface2 disabled:text-text3"
         >
           Answer
         </button>
@@ -73,12 +67,12 @@ export default function QuestionsForDev({
   if (open.length === 0) return null;
 
   return (
-    <section className="rounded-lg border border-brass/40 bg-brass/5 p-4 flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm font-medium text-brass">Questions to answer</h2>
+    <section className="rounded-xl border border-brass/30 bg-brass/[0.06] p-4 sm:p-5 flex flex-col gap-3.5 animate-fade-in">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-sm font-semibold text-brass tracking-tightish">Questions to answer</h2>
         <p className="text-xs text-text2">Answer to unblock completing your next task.</p>
       </div>
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col gap-2.5">
         {open.map((q) => (
           <OpenQuestion key={q.id} question={q} onAnswer={onAnswer} />
         ))}

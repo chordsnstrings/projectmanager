@@ -24,8 +24,8 @@ export default function SessionBar({ session, window: w, flaggedIds, selected, o
         aria-pressed={selected}
         aria-label={`session ${fmtClock(session.startedAt)} to ${session.endedAt ? fmtClock(session.endedAt) : 'now'}`}
         onClick={() => onSelect(session)}
-        className={`relative block h-full w-full rounded-sm overflow-hidden border cursor-pointer hover:brightness-125 ${
-          selected ? 'ring-2 ring-brass' : session.isOpen ? 'border-success/50' : 'border-hair2'
+        className={`relative block h-full w-full rounded-md overflow-hidden border cursor-pointer transition-[filter,box-shadow] hover:brightness-125 ${
+          selected ? 'ring-2 ring-brass ring-offset-1 ring-offset-panel' : session.isOpen ? 'border-success/50' : 'border-hair2'
         } bg-surface`}
       >
         {session.segments.map((seg, i) => {
