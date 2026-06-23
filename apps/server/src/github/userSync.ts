@@ -9,6 +9,8 @@ import {
   upsertTask,
   type Db,
 } from '../sync/upsert';
+import { env } from '../env';
+import { ensureRepoWebhooks, type RepoForHook } from './webhookSetup';
 
 const GH_API = 'https://api.github.com';
 
@@ -141,6 +143,17 @@ export async function syncUserProjects(
     const active = repos
       .filter((r) => r?.owner && !r.archived && !r.disabled && (!r.pushed_at || Date.parse(r.pushed_at) >= cutoff))
       .slice(0, 12);
+
+    // Register real-time webhooks on the repos this user administers (best-effort,
+    // idempotent) so push/PR/review/issue events flow in live for the whole repo.
+    if (env.GITHUB_WEBHOOK_SECRET && env.APP_BASE_URL.startsWith('https://')) {
+      const hookUrl = `${env.APP_BASE_URL}/webhooks/github`;
+      const hookRepos: RepoForHook[] = active
+        .filter((r) => r.permissions?.admin !== false)
+        .map((r) => ({ fullName: r.full_name, admin: r.permissions?.admin }));
+      await ensureRepoWebhooks(token, hookRepos, hookUrl, env.GITHUB_WEBHOOK_SECRET).catch(() => {});
+    }
+
     for (const repo of active) {
       const repoId = await upsertRepoFrom(db, repo);
       repoIds.add(repoId);
