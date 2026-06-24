@@ -5,6 +5,7 @@ import { env } from '../env';
 import { duplicateSessions, longOpenSession, openNoActivity, overrun, type FlagCandidate } from './flags';
 import { hasConcurrency, unionMinutes } from './sessionMath';
 import { dominantActivity } from './activity';
+import { TEAM_ACTIVITIES } from '@cadence/shared';
 import { localToday, resolveTz, startOfLocalDay } from '../lib/tz';
 
 /**
@@ -17,10 +18,12 @@ export async function generateInferredSegments(db: Db, now = Date.now()): Promis
   const since = new Date(now - 3 * 86_400_000);
   const sessions = await db.session.findMany({
     where: { deletedAt: null, taskId: { not: null }, startedAt: { gte: since } },
-    include: { segments: { take: 1 } },
+    include: { segments: { take: 1 }, user: { select: { team: { select: { key: true } } } } },
   });
   for (const s of sessions) {
     if (s.segments.length > 0 || !s.taskId) continue;
+    // Git inference is per-team: skip teams that tag activity manually (e.g. marketing).
+    if (!TEAM_ACTIVITIES[s.user.team?.key ?? '']?.inferFromGit) continue;
     const end = s.endedAt ?? new Date(now);
     const commits = await db.gitEvent.findMany({
       where: { type: 'commit', taskId: s.taskId, occurredAt: { gte: s.startedAt, lte: end } },

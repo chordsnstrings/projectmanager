@@ -1,6 +1,6 @@
 // Activity-type inference (§6). Inferred from commit messages / git signal; a
 // manual override segment wins for its span (handled at the segment layer).
-import type { ActivityType } from '@cadence/db';
+import type { ActivityType } from '@cadence/shared';
 
 const DEBUG_RE = /\b(fix|bug|hotfix|patch)\b/i;
 const CODE_RE = /\b(feat|add|implement|refactor|cleanup|rename|test)\b/i;

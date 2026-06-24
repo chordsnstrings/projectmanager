@@ -15,6 +15,35 @@ import { syncUserProjects } from '../github/userSync';
 
 const STATE_COOKIE = 'cad_oauth_state';
 
+type UserWithTeam = {
+  id: string;
+  githubLogin: string;
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  role: Me['role'];
+  stopOnCommit: boolean;
+  timezone: string | null;
+  teamId: string | null;
+  team: { key: string } | null;
+};
+
+function toMe(user: UserWithTeam): Me {
+  return {
+    id: user.id,
+    githubLogin: user.githubLogin,
+    name: user.name,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    role: user.role,
+    stopOnCommit: user.stopOnCommit,
+    timezone: user.timezone,
+    teamId: user.teamId,
+    teamKey: user.team?.key ?? null,
+    onboardingComplete: user.teamId != null,
+  };
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // ── Begin OAuth (identity) ────────────────────────────────────────────────
   app.get('/auth/github', async (_req, reply) => {
@@ -107,22 +136,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', async (req, reply) => {
     const userId = getSessionUserId(req);
     if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
-    const user = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+    const user = await prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      include: { team: { select: { key: true } } },
+    });
     if (!user) {
       clearSession(reply);
       return reply.code(401).send({ error: 'not_authenticated' });
     }
-    const me: Me = {
-      id: user.id,
-      githubLogin: user.githubLogin,
-      name: user.name,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      role: user.role,
-      stopOnCommit: user.stopOnCommit,
-      timezone: user.timezone,
-    };
-    return me;
+    return toMe(user);
   });
 
   // Per-user settings (auto-stop on commit; IANA timezone for local day/idle/digests).
@@ -142,6 +164,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
     const user = await prisma.user.update({ where: { id: userId }, data });
     return { stopOnCommit: user.stopOnCommit, timezone: user.timezone };
+  });
+
+  // Onboarding: pick a team. One team per user — once set, only an admin can
+  // reassign (PATCH /users/:id), so a member can't silently re-team themselves.
+  app.patch<{ Body: { teamKey?: string } }>('/me/team', async (req, reply) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
+    const teamKey = req.body?.teamKey;
+    if (!teamKey) return reply.code(400).send({ error: 'teamKey_required' });
+    const team = await prisma.team.findFirst({ where: { key: teamKey, deletedAt: null } });
+    if (!team) return reply.code(404).send({ error: 'team_not_found' });
+    const current = await prisma.user.findUnique({ where: { id: userId }, select: { teamId: true } });
+    if (current?.teamId) return reply.code(409).send({ error: 'team_already_set' });
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { teamId: team.id },
+      include: { team: { select: { key: true } } },
+    });
+    return toMe(user);
   });
 
   // ── Email aliases (confirm screen, §4) ────────────────────────────────────

@@ -318,6 +318,41 @@ describe('authed API integration', () => {
     expect(Array.isArray(comp.json().items)).toBe(true);
   });
 
+  it('onboarding: a team-less user picks a team and it sticks', async () => {
+    if (!available) return;
+    // ensure teams exist
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+
+    const fresh = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `new_${uniq()}`, role: 'dev', teamId: null },
+    });
+    // @ts-expect-error decorated by @fastify/cookie
+    const cookie = `cad_session=${app.signCookie(fresh.id)}`;
+
+    const me0 = await app.inject({ method: 'GET', url: '/me', headers: { cookie } });
+    expect(me0.json().onboardingComplete).toBe(false);
+    expect(me0.json().teamKey).toBeNull();
+
+    const teams = await app.inject({ method: 'GET', url: '/teams', headers: { cookie } });
+    expect(teams.statusCode).toBe(200);
+    expect(teams.json().some((t: { key: string }) => t.key === 'marketing')).toBe(true);
+
+    const bad = await app.inject({ method: 'PATCH', url: '/me/team', headers: { cookie }, payload: { teamKey: 'nope' } });
+    expect(bad.statusCode).toBe(404);
+
+    const set = await app.inject({ method: 'PATCH', url: '/me/team', headers: { cookie }, payload: { teamKey: 'marketing' } });
+    expect(set.statusCode).toBe(200);
+    expect(set.json().teamKey).toBe('marketing');
+    expect(set.json().onboardingComplete).toBe(true);
+
+    // one team per user — second set is rejected
+    const again = await app.inject({ method: 'PATCH', url: '/me/team', headers: { cookie }, payload: { teamKey: 'programming' } });
+    expect(again.statusCode).toBe(409);
+
+    await prisma.user.delete({ where: { id: fresh.id } });
+  });
+
   it('admin creates/assigns a manual task with collaborators; access is scoped', async () => {
     if (!available) return;
     const collab = await prisma.user.create({

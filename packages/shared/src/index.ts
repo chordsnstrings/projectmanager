@@ -2,10 +2,11 @@
 // Enums mirror the Prisma schema as string-literal unions so the web bundle
 // never has to import the Prisma client.
 
-export type Role = 'admin' | 'dev';
+export type Role = 'admin' | 'lead' | 'dev';
 export type TaskSource = 'issue' | 'pr' | 'branch' | 'manual';
 export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
-export type ActivityType = 'coding' | 'debugging' | 'research' | 'agent' | 'review';
+/** An activity key. Valid keys are team-specific — see TEAM_ACTIVITIES. */
+export type ActivityType = string;
 export type ActivitySource = 'inferred' | 'manual';
 export type GitEventType =
   | 'commit'
@@ -23,14 +24,53 @@ export type FlagType =
 export type FlagStatus = 'open' | 'resolved' | 'dismissed';
 export type QuestionStatus = 'open' | 'answered';
 
-/** Activity → colour map (design tokens §9). */
-export const ACTIVITY_COLORS: Record<ActivityType, string> = {
-  coding: '#2bb68c',
-  debugging: '#f0a93b',
-  research: '#4c9aea',
-  agent: '#9a8cf0',
-  review: '#8a909b',
+// ── Per-team activity taxonomy ───────────────────────────────────────────────
+// Each team has its own activity set, colors, and whether git commits are used
+// to infer activity. Adding a team later = add an entry here (+ a Team row).
+export interface ActivityDef {
+  key: string;
+  label: string;
+  color: string;
+}
+export interface TeamActivityConfig {
+  activities: ActivityDef[];
+  inferFromGit: boolean; // run git-commit inference for this team's sessions
+  defaultActivity: string;
+}
+export const TEAM_ACTIVITIES: Record<string, TeamActivityConfig> = {
+  programming: {
+    inferFromGit: true,
+    defaultActivity: 'coding',
+    activities: [
+      { key: 'coding', label: 'coding', color: '#2bb68c' },
+      { key: 'debugging', label: 'debugging', color: '#f0a93b' },
+      { key: 'research', label: 'research', color: '#4c9aea' },
+      { key: 'agent', label: 'agent', color: '#9a8cf0' },
+      { key: 'review', label: 'review', color: '#8a909b' },
+    ],
+  },
+  marketing: {
+    inferFromGit: false,
+    defaultActivity: 'design',
+    activities: [
+      { key: 'design', label: 'design', color: '#2bb68c' },
+      { key: 'video', label: 'video', color: '#f0a93b' },
+      { key: 'copywriting', label: 'copywriting', color: '#e0739a' },
+      { key: 'research', label: 'research', color: '#4c9aea' },
+      { key: 'ai', label: 'ai', color: '#9a8cf0' },
+    ],
+  },
 };
+
+/** Merged activity-key → colour map across all teams (for rendering segments). */
+export const ACTIVITY_COLORS: Record<string, string> = Object.fromEntries(
+  Object.values(TEAM_ACTIVITIES).flatMap((c) => c.activities.map((a) => [a.key, a.color])),
+);
+
+/** Valid activity keys for a team key (empty if the team is unknown). */
+export function activityKeysFor(teamKey: string | null | undefined): string[] {
+  return teamKey && TEAM_ACTIVITIES[teamKey] ? TEAM_ACTIVITIES[teamKey].activities.map((a) => a.key) : [];
+}
 
 export interface HealthStatus {
   status: 'ok';
@@ -47,6 +87,16 @@ export interface Me {
   role: Role;
   stopOnCommit: boolean;
   timezone: string | null;
+  teamId: string | null;
+  teamKey: string | null; // registry key for the activity set (null until onboarded)
+  onboardingComplete: boolean; // = teamId != null
+}
+
+/** A team for the onboarding picker / admin switcher. */
+export interface TeamDTO {
+  id: string;
+  key: string;
+  name: string;
 }
 
 /** Generic paginated envelope — every list endpoint uses this (§2). */

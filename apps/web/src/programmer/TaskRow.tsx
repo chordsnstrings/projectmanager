@@ -37,6 +37,8 @@ export interface TaskRowProps {
   onStart?: (taskId: string) => void;
   onStop?: (sessionId: string) => void;
   onOverrideActivity?: (sessionId: string, activity: ActivityType) => void;
+  /** the current user's team activity keys (for the one-tap cycle) */
+  activityKeys?: string[];
   onSaveSummary?: (
     sessionId: string,
     payload: { summary: string; blocked: boolean; closesIssues: number[] },
@@ -107,7 +109,7 @@ function StopIcon() {
   );
 }
 
-const ACTIVITIES: ActivityType[] = ['coding', 'debugging', 'research', 'agent', 'review'];
+const DEFAULT_ACTIVITIES: ActivityType[] = ['coding', 'debugging', 'research', 'agent', 'review'];
 
 export default function TaskRow({
   task,
@@ -120,10 +122,12 @@ export default function TaskRow({
   onOverrideActivity = noop,
   onSaveSummary = noop,
   onRename = noop,
+  activityKeys,
 }: TaskRowProps) {
   const running = state === 'running';
   const wrapping = state === 'wrapping';
   const activity: ActivityType | null = session?.inferredActivity ?? null;
+  const cycle = activityKeys && activityKeys.length > 0 ? activityKeys : DEFAULT_ACTIVITIES;
 
   // The signature 3px left edge — only on a running row, colored by activity.
   const edgeStyle =
@@ -176,7 +180,7 @@ export default function TaskRow({
             <>
               <button
                 type="button"
-                onClick={() => onOverrideActivity(session.id, nextActivity(activity))}
+                onClick={() => onOverrideActivity(session.id, nextActivity(activity, cycle))}
                 className="inline-flex items-center justify-center w-8 h-8 rounded-full transition-transform active:scale-90 hover:bg-white/[0.05]"
                 title={`activity: ${activity ?? 'idle'} (tap to change)`}
                 aria-label="change activity"
@@ -282,9 +286,9 @@ function TitleEditor({
   );
 }
 
-function nextActivity(current: ActivityType | null): ActivityType {
-  const idx = current ? ACTIVITIES.indexOf(current) : -1;
-  return ACTIVITIES[(idx + 1) % ACTIVITIES.length] ?? 'coding';
+function nextActivity(current: ActivityType | null, cycle: ActivityType[]): ActivityType {
+  const idx = current ? cycle.indexOf(current) : -1;
+  return cycle[(idx + 1) % cycle.length] ?? cycle[0] ?? 'coding';
 }
 
 function WrapPanel({

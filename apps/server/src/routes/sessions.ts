@@ -8,6 +8,7 @@ import type {
   StartSessionBody,
   StopSessionBody,
 } from '@cadence/shared';
+import { activityKeysFor } from '@cadence/shared';
 import { requireUser } from '../auth/require';
 import { sessionToDTO } from '../services/map';
 import { decryptToken } from '../auth/tokenCrypto';
@@ -222,6 +223,14 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       const { type, startedAt, endedAt } = req.body ?? ({} as ActivityOverrideBody);
       if (!type || !startedAt || !endedAt) {
         return reply.code(400).send({ error: 'type_startedAt_endedAt_required' });
+      }
+      // The activity must belong to the user's team set (e.g. marketing can't set 'coding').
+      const owner = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { team: { select: { key: true } } },
+      });
+      if (!activityKeysFor(owner?.team?.key).includes(type)) {
+        return reply.code(400).send({ error: 'invalid_activity' });
       }
       await prisma.activitySegment.create({
         data: {

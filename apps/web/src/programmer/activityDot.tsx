@@ -5,7 +5,7 @@ import { ACTIVITY_COLORS } from '../lib/activity';
 const NEUTRAL = '#686d77'; // text3
 
 export function activityColor(activity: ActivityType | null): string {
-  return activity ? ACTIVITY_COLORS[activity] : NEUTRAL;
+  return (activity ? ACTIVITY_COLORS[activity] : null) ?? NEUTRAL;
 }
 
 /** A small filled dot colored by inferred activity. */

@@ -10,7 +10,19 @@ datasource db {
 
 enum Role {
   admin
+  lead
   dev
+}
+
+// A team is the unit of visibility + activity taxonomy (e.g. programming, marketing).
+model Team {
+  id        String    @id @default(cuid())
+  key       String    @unique // registry key: 'programming' | 'marketing' | ...
+  name      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+  users     User[]
+  tasks     Task[]
 }
 
 enum TaskSource {
@@ -25,14 +37,6 @@ enum TaskStatus {
   in_progress
   in_review
   done
-}
-
-enum ActivityType {
-  coding
-  debugging
-  research
-  agent
-  review
 }
 
 enum ActivitySource {
@@ -81,11 +85,17 @@ model User {
   timezone    String?     // IANA tz id (e.g. "Asia/Karachi"); day boundaries, idle + digests use the user's local time
   lastLoginAt DateTime?   // most recent GitHub sign-in — drives the login-reminder emails
   githubAccessToken String? // OAuth token, AES-256-GCM encrypted at rest (per-user sync)
+  teamId      String?     // null only until onboarding picks a team
+  team        Team?       @relation(fields: [teamId], references: [id])
   emails      UserEmail[]
   sessions    Session[]
   taskMemberships TaskMember[]
+  flags       Flag[]
+  questions   Question[]  @relation("QuestionTarget")
   createdAt   DateTime    @default(now())
   deletedAt   DateTime?
+
+  @@index([teamId])
 }
 
 model UserEmail {
@@ -132,6 +142,8 @@ model Task {
   status          TaskStatus @default(todo)
   assigneeUserId  String? // primary owner
   createdByUserId String? // admin who created a manual task (audit)
+  teamId          String? // set for manual tasks; git tasks derive team from the assignee
+  team            Team?   @relation(fields: [teamId], references: [id])
   estimateMinutes Int? // §7
   milestoneTitle  String? // GitHub milestone (often a version, e.g. "v1.2") — completion grouping
   milestoneDueOn  DateTime?
@@ -146,6 +158,7 @@ model Task {
 
   @@unique([repoId, source, githubNumber, branch])
   @@index([assigneeUserId, status])
+  @@index([teamId, source, assigneeUserId])
 }
 
 // Additional collaborators on a task (the primary owner is Task.assigneeUserId).
@@ -186,7 +199,7 @@ model ActivitySegment {
   id        String         @id @default(cuid())
   sessionId String
   session   Session        @relation(fields: [sessionId], references: [id])
-  type      ActivityType
+  type      String // team-specific activity key, validated against the @cadence/shared registry
   source    ActivitySource @default(inferred)
   startedAt DateTime
   endedAt   DateTime
@@ -220,6 +233,7 @@ model Flag {
   id         String     @id @default(cuid())
   type       FlagType
   userId     String
+  user       User       @relation(fields: [userId], references: [id])
   sessionId  String?
   taskId     String?
   gitEventId String?
@@ -235,6 +249,7 @@ model Question {
   id           String         @id @default(cuid())
   adminUserId  String
   targetUserId String
+  targetUser   User           @relation("QuestionTarget", fields: [targetUserId], references: [id])
   taskId       String
   sessionId    String?
   body         String

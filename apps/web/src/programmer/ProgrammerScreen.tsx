@@ -30,6 +30,8 @@ export interface ProgrammerScreenProps {
   syncedAgo: string;
   date: string;
   nudge?: NudgeDTO | null;
+  /** the current user's team activity keys (one-tap cycle) */
+  activityKeys?: string[];
   tasks: TaskDTO[];
   /** keyed by task id */
   sessionsByTask: Record<string, TaskSessionState>;
@@ -92,6 +94,7 @@ export default function ProgrammerScreen({
   syncedAgo,
   date,
   nudge,
+  activityKeys,
   tasks,
   sessionsByTask,
   onStart = noop,
@@ -275,6 +278,7 @@ export default function ProgrammerScreen({
                   onOverrideActivity={onOverrideActivity}
                   onSaveSummary={onSaveSummary}
                   onRename={onRename}
+                  activityKeys={activityKeys}
                 />
               );
             })

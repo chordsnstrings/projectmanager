@@ -19,11 +19,13 @@ import type {
   MemberLite as MemberLiteDTO,
   RepoLite as RepoLiteDTO,
 } from '@cadence/shared';
+import { activityKeysFor } from './lib/activity';
 import { api, ApiError } from './lib/api';
 import { relativeTime } from './lib/format';
 import { downloadTeamCsv } from './lib/csv';
 import { Logo } from './components/Logo';
 import InstallButton from './components/InstallButton';
+import Onboarding from './Onboarding';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -94,7 +96,7 @@ export default function App() {
 
   // Land on the right slug once the role is known.
   useEffect(() => {
-    if (auth.kind !== 'authed') return;
+    if (auth.kind !== 'authed' || !auth.me.onboardingComplete) return;
     const p = route.path;
     if (auth.me.role === 'dev') {
       if (!p.startsWith('/board')) route.navigate('/board', true);
@@ -105,7 +107,16 @@ export default function App() {
 
   if (auth.kind === 'loading') return <Splash>connecting…</Splash>;
   if (auth.kind === 'anon') return <SignIn />;
-  return auth.me.role === 'admin' ? <AdminApp me={auth.me} route={route} /> : <DevApp me={auth.me} route={route} />;
+  // First-run: must pick a team before anything else.
+  if (!auth.me.onboardingComplete) {
+    return <Onboarding onDone={(me) => setAuth({ kind: 'authed', me })} />;
+  }
+  // Owners and leads use the admin app (team-scoped server-side); devs the board.
+  return auth.me.role === 'dev' ? (
+    <DevApp me={auth.me} route={route} />
+  ) : (
+    <AdminApp me={auth.me} route={route} />
+  );
 }
 
 // ── Chrome ──────────────────────────────────────────────────────────────────
@@ -438,6 +449,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onOpenDay={() => navigate('/board/day')}
         onOpenProgress={() => navigate('/board/progress')}
         productivity={productivity}
+        activityKeys={activityKeysFor(me.teamKey)}
         login={me.githubLogin}
         syncedAgo={syncedAgo}
         syncing={syncing}
