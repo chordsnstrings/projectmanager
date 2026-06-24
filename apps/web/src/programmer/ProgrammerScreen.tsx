@@ -15,6 +15,7 @@ import { Logo } from '../components/Logo';
 import InstallButton from '../components/InstallButton';
 import { liveElapsed } from '../lib/format';
 import QuestionsForDev from './QuestionsForDev';
+import TaskPool from './TaskPool';
 import AddActivity from './AddActivity';
 
 /** Per-task UI state bundle resolved by the parent (no fetching here). */
@@ -32,6 +33,10 @@ export interface ProgrammerScreenProps {
   nudge?: NudgeDTO | null;
   /** the current user's team activity keys (one-tap cycle) */
   activityKeys?: string[];
+  /** claimable unassigned team tasks */
+  pool?: TaskDTO[];
+  onClaim?: (taskId: string) => void;
+  onCreateTask?: (title: string, estimateMinutes: number | null) => void;
   tasks: TaskDTO[];
   /** keyed by task id */
   sessionsByTask: Record<string, TaskSessionState>;
@@ -95,6 +100,9 @@ export default function ProgrammerScreen({
   date,
   nudge,
   activityKeys,
+  pool = [],
+  onClaim = noop,
+  onCreateTask = noop,
   tasks,
   sessionsByTask,
   onStart = noop,
@@ -178,6 +186,9 @@ export default function ProgrammerScreen({
 
         {/* Open questions the dev must answer (gates next completion) */}
         <QuestionsForDev questions={questions} onAnswer={onAnswerQuestion} />
+
+        {/* Team task pool — claim work or add your own */}
+        <TaskPool pool={pool} onClaim={onClaim} onCreateTask={onCreateTask} />
 
         {/* Detected-branch nudge banner */}
         {nudge && (

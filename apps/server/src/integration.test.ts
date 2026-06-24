@@ -355,20 +355,25 @@ describe('authed API integration', () => {
 
   it('admin creates/assigns a manual task with collaborators; access is scoped', async () => {
     if (!available) return;
+    // Tasks are team-scoped: put the admin, assignee and collaborator on one team.
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
     const collab = await prisma.user.create({
-      data: { githubId: BigInt(uniq()), githubLogin: `collab_${uniq()}`, role: 'dev' },
+      data: { githubId: BigInt(uniq()), githubLogin: `collab_${uniq()}`, role: 'dev', teamId: prog.id },
     });
     const outsider = await prisma.user.create({
-      data: { githubId: BigInt(uniq()), githubLogin: `out_${uniq()}`, role: 'dev' },
+      data: { githubId: BigInt(uniq()), githubLogin: `out_${uniq()}`, role: 'dev', teamId: prog.id },
     });
     // @ts-expect-error decorated by @fastify/cookie
     const collabCookie = `cad_session=${app.signCookie(collab.id)}`;
     // @ts-expect-error decorated by @fastify/cookie
     const outsiderCookie = `cad_session=${app.signCookie(outsider.id)}`;
 
-    // a dev cannot create a task
-    const forbidden = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: devCookie }, payload: { title: 'x' } });
-    expect(forbidden.statusCode).toBe(403);
+    // a dev may create a task for their own team but cannot assign it to someone else
+    const selfAssign = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: devCookie }, payload: { title: 'self', assigneeUserId: collab.id } });
+    expect(selfAssign.statusCode).toBe(403);
 
     // admin creates a manual task assigned to dev, with collab as collaborator
     const created = await app.inject({
@@ -424,6 +429,53 @@ describe('authed API integration', () => {
     await prisma.taskMember.deleteMany({ where: { taskId: task.id } });
     await prisma.task.delete({ where: { id: task.id } });
     await prisma.user.deleteMany({ where: { id: { in: [collab.id, outsider.id] } } });
+  });
+
+  it('self-serve pool: members create + claim within their team', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    const mkt = await prisma.team.findUniqueOrThrow({ where: { key: 'marketing' } });
+    const mk = (teamId: string, p: string) =>
+      prisma.user.create({ data: { githubId: BigInt(uniq()), githubLogin: `${p}_${uniq()}`, role: 'dev', teamId } });
+    const a1 = await mk(prog.id, 'a1');
+    const a2 = await mk(prog.id, 'a2');
+    const b1 = await mk(mkt.id, 'b1');
+    // @ts-expect-error signCookie decorated by @fastify/cookie
+    const ck = (id: string) => `cad_session=${app.signCookie(id)}`;
+
+    // a1 creates an unassigned pool task for their team
+    const created = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: ck(a1.id) }, payload: { title: 'Write launch copy' } });
+    expect(created.statusCode).toBe(200);
+    const taskId = created.json().id;
+    expect(created.json().assignee).toBeNull();
+
+    // a member can't assign the task to someone else
+    const badAssign = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: ck(a1.id) }, payload: { title: 'x', assigneeUserId: a2.id } });
+    expect(badAssign.statusCode).toBe(403);
+
+    // it shows in a1's pool, not in another team's pool
+    const poolA = await app.inject({ method: 'GET', url: '/tasks/pool', headers: { cookie: ck(a1.id) } });
+    expect(poolA.json().items.some((t: { id: string }) => t.id === taskId)).toBe(true);
+    const poolB = await app.inject({ method: 'GET', url: '/tasks/pool', headers: { cookie: ck(b1.id) } });
+    expect(poolB.json().items.some((t: { id: string }) => t.id === taskId)).toBe(false);
+
+    // cross-team claim rejected; same-team claim works
+    expect((await app.inject({ method: 'POST', url: `/tasks/${taskId}/claim`, headers: { cookie: ck(b1.id) }, payload: {} })).statusCode).toBe(403);
+    const claim = await app.inject({ method: 'POST', url: `/tasks/${taskId}/claim`, headers: { cookie: ck(a2.id) }, payload: {} });
+    expect(claim.statusCode).toBe(200);
+    expect(claim.json().assignee.id).toBe(a2.id);
+
+    // already claimed by a2 → a1 gets 409
+    expect((await app.inject({ method: 'POST', url: `/tasks/${taskId}/claim`, headers: { cookie: ck(a1.id) }, payload: {} })).statusCode).toBe(409);
+
+    // and it's no longer in the pool
+    const poolAfter = await app.inject({ method: 'GET', url: '/tasks/pool', headers: { cookie: ck(a1.id) } });
+    expect(poolAfter.json().items.some((t: { id: string }) => t.id === taskId)).toBe(false);
+
+    await prisma.task.deleteMany({ where: { createdByUserId: { in: [a1.id, a2.id] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [a1.id, a2.id, b1.id] } } });
   });
 
   it('team scoping: leads see only their team; owner sees all + ?team filter', async () => {

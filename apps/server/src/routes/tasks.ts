@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '@cadence/db';
 import type { TaskStatus } from '@cadence/db';
 import type { ManagedTask, Paginated, TaskDTO } from '@cadence/shared';
-import { assertCanViewUser, managerTeamWhere, requireAdmin, requireManager, requireUser } from '../auth/require';
+import { assertCanViewUser, managerTeamWhere, requireManager, requireUser } from '../auth/require';
 import { managedTaskToDTO, taskToDTO } from '../services/map';
 import { decryptToken } from '../auth/tokenCrypto';
 import { syncUserProjects } from '../github/userSync';
@@ -24,6 +24,10 @@ const managedInclude = {
 
 type ManagedRow = Parameters<typeof managedTaskToDTO>[0];
 
+function loadManaged(id: string) {
+  return prisma.task.findUniqueOrThrow({ where: { id }, include: managedInclude });
+}
+
 async function toManaged(task: ManagedRow & { assigneeUserId: string | null }): Promise<ManagedTask> {
   const assignee = task.assigneeUserId
     ? await prisma.user.findUnique({
@@ -35,41 +39,86 @@ async function toManaged(task: ManagedRow & { assigneeUserId: string | null }): 
 }
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
-  // Admin creates a manual (non-git) task and assigns it. Collaborators optional.
+  // Any member may create a manual task for their OWN team and self-assign or
+  // leave it in the pool. Managers (admin/lead) may assign anyone in the team.
   app.post<{
     Body: {
       title?: string;
-      assigneeUserId?: string;
+      assigneeUserId?: string | null;
       collaboratorIds?: string[];
       estimateMinutes?: number | null;
       status?: TaskStatus;
     };
   }>('/tasks', async (req, reply) => {
-    const admin = await requireAdmin(req, reply);
-    if (!admin) return;
+    const actor = await requireUser(req, reply);
+    if (!actor) return;
+    if (!actor.teamId) return reply.code(409).send({ error: 'no_team', detail: 'Pick a team first.' });
     const title = req.body?.title?.trim();
     if (!title) return reply.code(400).send({ error: 'title_required' });
     const status = req.body?.status && STATUSES.includes(req.body.status) ? req.body.status : 'todo';
+    const isManager = actor.role === 'admin' || actor.role === 'lead';
+
+    // Members can only assign to themselves or leave unassigned.
+    let assigneeUserId = req.body?.assigneeUserId ?? null;
+    if (!isManager && assigneeUserId && assigneeUserId !== actor.id) {
+      return reply.code(403).send({ error: 'members_self_assign_only' });
+    }
     const collaboratorIds = [...new Set(req.body?.collaboratorIds ?? [])].filter(
-      (id) => id && id !== req.body?.assigneeUserId,
+      (id) => id && id !== assigneeUserId,
     );
+    // Everyone on the task must be in the actor's team.
+    const peopleIds = [...new Set([assigneeUserId, ...collaboratorIds].filter(Boolean) as string[])];
+    if (peopleIds.length > 0) {
+      const inTeam = await prisma.user.count({ where: { id: { in: peopleIds }, teamId: actor.teamId } });
+      if (inTeam !== peopleIds.length) return reply.code(403).send({ error: 'cross_team_member' });
+    }
 
     const created = await prisma.task.create({
       data: {
         source: 'manual',
         repoId: null,
+        teamId: actor.teamId,
         title: title.slice(0, 200),
         status,
-        assigneeUserId: req.body?.assigneeUserId ?? null,
-        createdByUserId: admin.id,
+        assigneeUserId,
+        createdByUserId: actor.id,
         estimateMinutes: req.body?.estimateMinutes ?? null,
         closedAt: status === 'done' ? new Date() : null,
         members: { create: collaboratorIds.map((userId) => ({ userId })) },
       },
       include: managedInclude,
     });
-    req.log.info({ audit: 'task.created', taskId: created.id, by: admin.id }, 'audit');
+    req.log.info({ audit: 'task.created', taskId: created.id, by: actor.id, team: actor.teamId }, 'audit');
     return toManaged(created);
+  });
+
+  // Open pool: claimable unassigned manual tasks in the caller's team.
+  app.get('/tasks/pool', async (req, reply) => {
+    const actor = await requireUser(req, reply);
+    if (!actor) return;
+    if (!actor.teamId) return { items: [], nextCursor: null };
+    const rows = await prisma.task.findMany({
+      where: { deletedAt: null, source: 'manual', assigneeUserId: null, teamId: actor.teamId },
+      include: { repo: { select: { fullName: true } }, sessions: { where: { deletedAt: null }, select: { startedAt: true, endedAt: true } } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: PAGE,
+    });
+    const body: Paginated<TaskDTO> = { items: rows.map(taskToDTO), nextCursor: null };
+    return body;
+  });
+
+  // Claim ("pick up") an unassigned team task.
+  app.post<{ Params: { id: string } }>('/tasks/:id/claim', async (req, reply) => {
+    const actor = await requireUser(req, reply);
+    if (!actor) return;
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+    if (task.teamId !== actor.teamId) return reply.code(403).send({ error: 'not_your_team' });
+    if (task.assigneeUserId === actor.id) return toManaged(await loadManaged(task.id)); // no-op
+    if (task.assigneeUserId) return reply.code(409).send({ error: 'already_claimed' });
+    await prisma.task.update({ where: { id: task.id }, data: { assigneeUserId: actor.id } });
+    req.log.info({ audit: 'task.claimed', taskId: task.id, by: actor.id }, 'audit');
+    return toManaged(await loadManaged(task.id));
   });
 
   // Managers: list manual/assigned tasks (owner = all/optional ?team; lead = own team).
@@ -118,8 +167,10 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     if (!user) return;
     const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!task) return reply.code(404).send({ error: 'task_not_found' });
-    const isAdmin = user.role === 'admin';
-    if (!isAdmin && task.assigneeUserId !== user.id) {
+    // Manager of the task's team (admin any; lead own-team) may manage assignment;
+    // the assignee may edit title/status/estimate.
+    const isManager = user.role === 'admin' || (user.role === 'lead' && !!task.teamId && task.teamId === user.teamId);
+    if (!isManager && task.assigneeUserId !== user.id) {
       return reply.code(403).send({ error: 'forbidden' });
     }
 
@@ -133,10 +184,10 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       data.closedAt = b.status === 'done' ? task.closedAt ?? new Date() : null;
     }
     if (b.estimateMinutes !== undefined) data.estimateMinutes = b.estimateMinutes;
-    if (isAdmin && b.assigneeUserId !== undefined) data.assigneeUserId = b.assigneeUserId;
+    if (isManager && b.assigneeUserId !== undefined) data.assigneeUserId = b.assigneeUserId;
 
-    // Collaborators are admin-only and replace the existing set.
-    if (isAdmin && b.collaboratorIds !== undefined) {
+    // Collaborators are manager-only and replace the existing set.
+    if (isManager && b.collaboratorIds !== undefined) {
       const ids = [...new Set(b.collaboratorIds)].filter(
         (id) => id && id !== (b.assigneeUserId ?? task.assigneeUserId),
       );

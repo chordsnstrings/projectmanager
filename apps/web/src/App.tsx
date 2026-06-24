@@ -185,26 +185,44 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
   const [productivity, setProductivity] = useState<ProductivityDTO | null>(null);
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
+  const [pool, setPool] = useState<TaskDTO[]>([]);
   const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, a, n, q, prod] = await Promise.all([
+    const [t, a, n, q, prod, pl] = await Promise.all([
       api<Paginated<TaskDTO>>('/tasks').then((p) => p.items).catch(() => [] as TaskDTO[]),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
       api<QuestionDTO[]>('/questions?status=open').catch(() => [] as QuestionDTO[]),
       api<ProductivityDTO>('/me/productivity').catch(() => null),
+      api<Paginated<TaskDTO>>('/tasks/pool').then((p) => p.items).catch(() => [] as TaskDTO[]),
     ]);
     setTasks(t);
     setActive(a);
     setNudges(n);
     setQuestions(q);
     setProductivity(prod);
+    setPool(pl);
     setLoaded(true);
   }, []);
+
+  const onClaim = useCallback(
+    async (taskId: string) => {
+      await api(`/tasks/${taskId}/claim`, { method: 'POST', body: '{}' }).catch(() => {});
+      await refresh();
+    },
+    [refresh],
+  );
+  const onCreateTask = useCallback(
+    async (title: string, estimateMinutes: number | null) => {
+      await api('/tasks', { method: 'POST', body: JSON.stringify({ title, estimateMinutes, assigneeUserId: me.id }) }).catch(() => {});
+      await refresh();
+    },
+    [refresh, me.id],
+  );
 
   const onAnswerQuestion = useCallback(
     async (id: string, answer: string) => {
@@ -451,6 +469,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onOpenProgress={() => navigate('/board/progress')}
         productivity={productivity}
         activityKeys={activityKeysFor(me.teamKey)}
+        pool={pool}
+        onClaim={onClaim}
+        onCreateTask={onCreateTask}
         login={me.githubLogin}
         syncedAgo={syncedAgo}
         syncing={syncing}
