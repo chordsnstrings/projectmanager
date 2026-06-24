@@ -317,4 +317,77 @@ describe('authed API integration', () => {
     expect(comp.statusCode).toBe(200);
     expect(Array.isArray(comp.json().items)).toBe(true);
   });
+
+  it('admin creates/assigns a manual task with collaborators; access is scoped', async () => {
+    if (!available) return;
+    const collab = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `collab_${uniq()}`, role: 'dev' },
+    });
+    const outsider = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `out_${uniq()}`, role: 'dev' },
+    });
+    // @ts-expect-error decorated by @fastify/cookie
+    const collabCookie = `cad_session=${app.signCookie(collab.id)}`;
+    // @ts-expect-error decorated by @fastify/cookie
+    const outsiderCookie = `cad_session=${app.signCookie(outsider.id)}`;
+
+    // a dev cannot create a task
+    const forbidden = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: devCookie }, payload: { title: 'x' } });
+    expect(forbidden.statusCode).toBe(403);
+
+    // admin creates a manual task assigned to dev, with collab as collaborator
+    const created = await app.inject({
+      method: 'POST',
+      url: '/tasks',
+      headers: { cookie: adminCookie },
+      payload: { title: 'Ship onboarding', assigneeUserId: devId, collaboratorIds: [collab.id], estimateMinutes: 120 },
+    });
+    expect(created.statusCode).toBe(200);
+    const task = created.json();
+    expect(task.source).toBe('manual');
+    expect(task.repoFullName).toBeNull();
+    expect(task.assignee.id).toBe(devId);
+    expect(task.members.map((m: { id: string }) => m.id)).toContain(collab.id);
+
+    // shows up in the admin managed list
+    const managed = await app.inject({ method: 'GET', url: '/tasks/managed', headers: { cookie: adminCookie } });
+    expect(managed.statusCode).toBe(200);
+    expect(managed.json().items.some((t: { id: string }) => t.id === task.id)).toBe(true);
+
+    // collaborator sees it on their board and can start a session
+    const collabTasks = await app.inject({ method: 'GET', url: '/tasks', headers: { cookie: collabCookie } });
+    expect(collabTasks.json().items.some((t: { id: string }) => t.id === task.id)).toBe(true);
+    const collabSession = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: collabCookie }, payload: { taskId: task.id } });
+    expect(collabSession.statusCode).toBe(201);
+
+    // an outsider cannot start a session on the private manual task
+    const outsiderSession = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: outsiderCookie }, payload: { taskId: task.id } });
+    expect(outsiderSession.statusCode).toBe(403);
+
+    // admin updates status + clears collaborators
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/tasks/${task.id}`,
+      headers: { cookie: adminCookie },
+      payload: { status: 'in_progress', collaboratorIds: [] },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().status).toBe('in_progress');
+    expect(patched.json().members.length).toBe(0);
+
+    // a non-assignee dev cannot patch the task
+    const devPatch = await app.inject({ method: 'PATCH', url: `/tasks/${task.id}`, headers: { cookie: outsiderCookie }, payload: { status: 'done' } });
+    expect(devPatch.statusCode).toBe(403);
+
+    // directory: /users admin-only, /repos open to any signed-in user
+    expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: devCookie } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: adminCookie } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/repos', headers: { cookie: collabCookie } })).statusCode).toBe(200);
+
+    // cleanup
+    await prisma.session.deleteMany({ where: { taskId: task.id } });
+    await prisma.taskMember.deleteMany({ where: { taskId: task.id } });
+    await prisma.task.delete({ where: { id: task.id } });
+    await prisma.user.deleteMany({ where: { id: { in: [collab.id, outsider.id] } } });
+  });
 });

@@ -291,7 +291,7 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
       taskId: task?.id ?? null,
       title: task?.displayTitle ?? task?.title ?? first.offTaskLabel ?? 'Off-task',
       origin: task ? taskOrigin(task) : 'off-task',
-      repoFullName: task?.repo.fullName ?? '—',
+      repoFullName: task?.repo?.fullName ?? '—',
       estimateMinutes: task?.estimateMinutes ?? null,
       actualMinutes: actual,
       varianceMinutes: task?.estimateMinutes ? actual - task.estimateMinutes : null,

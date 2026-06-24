@@ -151,8 +151,17 @@ export default function TaskRow({
           <TitleEditor task={task} onRename={onRename} />
           <div className="mt-1.5 flex items-center gap-2.5 flex-wrap text-[11px] text-text3">
             <Origin task={task} />
-            <span className="opacity-30">·</span>
-            <span className="font-mono">{task.repoFullName}</span>
+            {task.repoFullName ? (
+              <>
+                <span className="opacity-30">·</span>
+                <span className="font-mono">{task.repoFullName}</span>
+              </>
+            ) : task.source === 'manual' ? (
+              <>
+                <span className="opacity-30">·</span>
+                <span className="font-mono text-text3">no git</span>
+              </>
+            ) : null}
             <StatusBadge status={task.status} />
             {task.estimateMinutes != null && (
               <span className="font-mono">est {fmtDuration(task.estimateMinutes)}</span>

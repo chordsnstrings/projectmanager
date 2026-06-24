@@ -14,6 +14,7 @@ import { sessionRoutes } from './routes/sessions';
 import { flagRoutes } from './routes/flags';
 import { questionRoutes } from './routes/questions';
 import { dashboardRoutes } from './routes/dashboard';
+import { directoryRoutes } from './routes/directory';
 import { integrationRoutes } from './routes/integrations';
 import { progressRoutes } from './routes/progress';
 
@@ -65,6 +66,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(flagRoutes);
   await app.register(questionRoutes);
   await app.register(dashboardRoutes);
+  await app.register(directoryRoutes);
   await app.register(integrationRoutes);
   await app.register(progressRoutes);
 

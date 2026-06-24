@@ -23,6 +23,7 @@ const tasks: TaskDTO[] = [
     estimateMinutes: 180,
     actualMinutes: 96,
     reopenCount: 0,
+    assigneeUserId: null,
     origin: '#142',
   },
   {
@@ -36,6 +37,7 @@ const tasks: TaskDTO[] = [
     estimateMinutes: 60,
     actualMinutes: 74,
     reopenCount: 1,
+    assigneeUserId: null,
     origin: 'PR #88',
   },
   {
@@ -49,6 +51,7 @@ const tasks: TaskDTO[] = [
     estimateMinutes: null,
     actualMinutes: 22,
     reopenCount: 0,
+    assigneeUserId: null,
     origin: 'feat/foo',
   },
   {
@@ -62,6 +65,7 @@ const tasks: TaskDTO[] = [
     estimateMinutes: 45,
     actualMinutes: 0,
     reopenCount: 0,
+    assigneeUserId: null,
     origin: '#201',
   },
 ];

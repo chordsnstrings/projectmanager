@@ -27,8 +27,20 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'taskId_or_offTaskLabel_required' });
     }
     if (taskId) {
-      const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null } });
+      const task = await prisma.task.findFirst({
+        where: { id: taskId, deletedAt: null },
+        include: { members: { where: { deletedAt: null }, select: { userId: true } } },
+      });
       if (!task) return reply.code(404).send({ error: 'task_not_found' });
+      // Manual tasks are private to their assignee + collaborators (git tasks stay open).
+      if (
+        task.source === 'manual' &&
+        user.role !== 'admin' &&
+        task.assigneeUserId !== user.id &&
+        !task.members.some((m) => m.userId === user.id)
+      ) {
+        return reply.code(403).send({ error: 'not_a_member' });
+      }
     }
 
     // Backfill path: a completed session with explicit start/end — same day only.

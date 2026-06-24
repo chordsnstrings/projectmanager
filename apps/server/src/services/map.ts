@@ -6,6 +6,7 @@ import { sumMinutes } from '../engine/sessionMath';
 export function taskOrigin(t: Pick<Task, 'source' | 'githubNumber' | 'branch'>): string {
   if (t.source === 'issue') return `#${t.githubNumber ?? '?'}`;
   if (t.source === 'pr') return `PR #${t.githubNumber ?? '?'}`;
+  if (t.source === 'manual') return t.branch ?? 'task';
   return t.branch ?? 'branch';
 }
 
@@ -27,11 +28,11 @@ export function actualMinutes(
 }
 
 export function taskToDTO(
-  t: Task & { repo: { fullName: string }; sessions: Pick<Session, 'startedAt' | 'endedAt'>[] },
+  t: Task & { repo: { fullName: string } | null; sessions: Pick<Session, 'startedAt' | 'endedAt'>[] },
 ): TaskDTO {
   return {
     id: t.id,
-    repoFullName: t.repo.fullName,
+    repoFullName: t.repo?.fullName ?? null,
     source: t.source,
     githubNumber: t.githubNumber,
     branch: t.branch,
@@ -40,7 +41,32 @@ export function taskToDTO(
     estimateMinutes: t.estimateMinutes,
     actualMinutes: actualMinutes(t.sessions),
     reopenCount: t.reopenCount,
+    assigneeUserId: t.assigneeUserId,
     origin: taskOrigin(t),
+  };
+}
+
+/** Map a Task (+ assignee/members joined) to the admin ManagedTask DTO. */
+export function managedTaskToDTO(
+  t: Task & {
+    repo: { fullName: string } | null;
+    sessions: Pick<Session, 'startedAt' | 'endedAt'>[];
+    members: { user: { id: string; githubLogin: string; name: string | null; avatarUrl: string | null } }[];
+  },
+  assignee: { id: string; githubLogin: string; name: string | null; avatarUrl: string | null } | null,
+): import('@cadence/shared').ManagedTask {
+  return {
+    ...taskToDTO(t),
+    assignee: assignee
+      ? { id: assignee.id, githubLogin: assignee.githubLogin, name: assignee.name, avatarUrl: assignee.avatarUrl }
+      : null,
+    members: t.members.map((m) => ({
+      id: m.user.id,
+      githubLogin: m.user.githubLogin,
+      name: m.user.name,
+      avatarUrl: m.user.avatarUrl,
+    })),
+    createdAt: t.createdAt.toISOString(),
   };
 }
 

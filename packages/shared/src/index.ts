@@ -3,7 +3,7 @@
 // never has to import the Prisma client.
 
 export type Role = 'admin' | 'dev';
-export type TaskSource = 'issue' | 'pr' | 'branch';
+export type TaskSource = 'issue' | 'pr' | 'branch' | 'manual';
 export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
 export type ActivityType = 'coding' | 'debugging' | 'research' | 'agent' | 'review';
 export type ActivitySource = 'inferred' | 'manual';
@@ -58,7 +58,8 @@ export interface Paginated<T> {
 // ── Tasks (§8 GET /tasks) ───────────────────────────────────────────────────
 export interface TaskDTO {
   id: string;
-  repoFullName: string;
+  /** null for manual (non-git) tasks */
+  repoFullName: string | null;
   source: TaskSource;
   githubNumber: number | null;
   branch: string | null;
@@ -68,8 +69,32 @@ export interface TaskDTO {
   /** sum of this task's sessions, in minutes (computed) */
   actualMinutes: number;
   reopenCount: number;
-  /** origin label for the row, e.g. "#142", "PR #88", "feat/foo" */
+  /** primary owner (null if unassigned) */
+  assigneeUserId: string | null;
+  /** origin label for the row, e.g. "#142", "PR #88", "feat/foo", "task" */
   origin: string;
+}
+
+/** Slim user shape for assignee / collaborator pickers and avatars. */
+export interface MemberLite {
+  id: string;
+  githubLogin: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
+/** Slim connected-repo shape for the "create branch" picker. */
+export interface RepoLite {
+  id: string;
+  fullName: string;
+  defaultBranch: string;
+}
+
+/** A manual/assigned task as shown in the admin Tasks tab. */
+export interface ManagedTask extends TaskDTO {
+  assignee: MemberLite | null;
+  members: MemberLite[];
+  createdAt: string;
 }
 
 // ── Sessions (§8) ───────────────────────────────────────────────────────────

@@ -177,7 +177,7 @@ export async function listCompletions(
   const items: CompletionItem[] = rows.slice(0, PAGE).map((t) => ({
     taskId: t.id,
     title: t.displayTitle ?? t.title,
-    repoFullName: t.repo.fullName,
+    repoFullName: t.repo?.fullName ?? '—',
     origin: taskOrigin(t),
     status: t.status,
     milestoneTitle: t.milestoneTitle,

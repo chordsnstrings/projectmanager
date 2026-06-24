@@ -17,6 +17,7 @@ enum TaskSource {
   issue
   pr
   branch
+  manual
 }
 
 enum TaskStatus {
@@ -82,6 +83,7 @@ model User {
   githubAccessToken String? // OAuth token, AES-256-GCM encrypted at rest (per-user sync)
   emails      UserEmail[]
   sessions    Session[]
+  taskMemberships TaskMember[]
   createdAt   DateTime    @default(now())
   deletedAt   DateTime?
 }
@@ -120,15 +122,16 @@ model Repo {
 
 model Task {
   id              String     @id @default(cuid())
-  repoId          String
-  repo            Repo       @relation(fields: [repoId], references: [id])
+  repoId          String? // null for manual (non-git) tasks
+  repo            Repo?      @relation(fields: [repoId], references: [id])
   source          TaskSource
   githubNumber    Int? // issue/PR number; null for pure-branch tasks
-  branch          String? // branch name when source = branch/pr
-  title           String // canonical title synced from git (never user-edited)
+  branch          String? // branch name when source = branch/pr/manual+git
+  title           String // canonical title synced from git, OR admin-set for manual tasks
   displayTitle    String? // Cadence-local rename override (never pushed to GitHub)
   status          TaskStatus @default(todo)
-  assigneeUserId  String?
+  assigneeUserId  String? // primary owner
+  createdByUserId String? // admin who created a manual task (audit)
   estimateMinutes Int? // §7
   milestoneTitle  String? // GitHub milestone (often a version, e.g. "v1.2") — completion grouping
   milestoneDueOn  DateTime?
@@ -139,9 +142,24 @@ model Task {
   deletedAt       DateTime?
   sessions        Session[]
   gitEvents       GitEvent[]
+  members         TaskMember[]
 
   @@unique([repoId, source, githubNumber, branch])
   @@index([assigneeUserId, status])
+}
+
+// Additional collaborators on a task (the primary owner is Task.assigneeUserId).
+model TaskMember {
+  id        String    @id @default(cuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@unique([taskId, userId])
+  @@index([userId])
 }
 
 model Session {

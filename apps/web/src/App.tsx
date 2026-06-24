@@ -15,6 +15,9 @@ import type {
   Trends as TrendsDTO,
   Progress as ProgressDTO,
   Productivity as ProductivityDTO,
+  ManagedTask as ManagedTaskDTO,
+  MemberLite as MemberLiteDTO,
+  RepoLite as RepoLiteDTO,
 } from '@cadence/shared';
 import { api, ApiError } from './lib/api';
 import { relativeTime } from './lib/format';
@@ -28,6 +31,7 @@ import DayTimeline from './admin/DayTimeline';
 import Trends from './admin/Trends';
 import ProgressView from './admin/ProgressView';
 import CompletionLog from './admin/CompletionLog';
+import TasksPanel from './admin/TasksPanel';
 import FlagsPanel from './admin/FlagsPanel';
 import AskAboutTask from './admin/AskAboutTask';
 import SendDigestButton from './admin/SendDigestButton';
@@ -476,7 +480,7 @@ function shiftDate(d: string, delta: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-type AdminTab = 'team' | 'flags' | 'questions';
+type AdminTab = 'team' | 'tasks' | 'flags' | 'questions';
 
 function AdminApp({ me, route }: { me: Me; route: Route }) {
   const { path, params, navigate } = route;
@@ -491,7 +495,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     ? 'flags'
     : path.startsWith('/admin/questions')
       ? 'questions'
-      : 'team';
+      : path.startsWith('/admin/tasks')
+        ? 'tasks'
+        : 'team';
   const teamView: 'roster' | 'day' = path.startsWith('/admin/team/day') ? 'day' : 'roster';
   const date = params.get('date') ?? todayStr();
   const isToday = date === todayStr();
@@ -503,6 +509,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [flags, setFlags] = useState<FlagDTO[]>([]);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
+  const [managedTasks, setManagedTasks] = useState<ManagedTaskDTO[] | null>(null);
+  const [roster, setRoster] = useState<MemberLiteDTO[]>([]);
+  const [repos, setRepos] = useState<RepoLiteDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   // setDate keeps the slug, writing ?date= (dropped when today).
@@ -526,6 +535,13 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   );
   const loadQuestions = useCallback(
     () => api<QuestionDTO[]>('/questions').then(setQuestions).catch(() => setQuestions([])),
+    [],
+  );
+  const loadManagedTasks = useCallback(
+    () =>
+      api<Paginated<ManagedTaskDTO>>('/tasks/managed')
+        .then((p) => setManagedTasks(p.items))
+        .catch(() => setManagedTasks([])),
     [],
   );
 
@@ -567,7 +583,12 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   useEffect(() => {
     if (tab === 'flags') void loadFlags();
     if (tab === 'questions') void loadQuestions();
-  }, [tab, loadFlags, loadQuestions]);
+    if (tab === 'tasks') {
+      void loadManagedTasks();
+      if (roster.length === 0) void api<MemberLiteDTO[]>('/users').then(setRoster).catch(() => {});
+      if (repos.length === 0) void api<RepoLiteDTO[]>('/repos').then(setRepos).catch(() => {});
+    }
+  }, [tab, loadFlags, loadQuestions, loadManagedTasks, roster.length, repos.length]);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -661,6 +682,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
       <div className="px-4 sm:px-6 pt-5 max-w-6xl mx-auto w-full flex items-center gap-1.5 flex-wrap">
         {tabBtn('team', 'Team')}
+        {tabBtn('tasks', 'Tasks')}
         {tabBtn('flags', 'Flags')}
         {tabBtn('questions', 'Questions')}
       </div>
@@ -670,6 +692,13 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} />
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} />
+        ) : tab === 'tasks' ? (
+          <TasksPanel
+            tasks={managedTasks}
+            roster={roster}
+            repos={repos}
+            onChanged={loadManagedTasks}
+          />
         ) : selectedUser ? (
           <div className="animate-fade-in">
             <div className="mb-5 flex items-center gap-2 flex-wrap">
