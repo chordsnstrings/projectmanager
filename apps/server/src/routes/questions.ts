@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '@cadence/db';
 import type { AnswerQuestionBody, QuestionDTO, RaiseQuestionBody } from '@cadence/shared';
-import { requireAdmin, requireUser } from '../auth/require';
+import { assertCanViewUser, requireManager, requireUser } from '../auth/require';
 
 function toDTO(q: {
   id: string;
@@ -32,17 +32,19 @@ function toDTO(q: {
 }
 
 export async function questionRoutes(app: FastifyInstance): Promise<void> {
-  // Admin raises a question on a session/task → gates the dev's next completion.
+  // Manager raises a question on a session/task → gates the dev's next completion.
+  // Owner may target anyone; a lead only users in their own team.
   app.post<{ Body: RaiseQuestionBody }>('/questions', async (req, reply) => {
-    const admin = await requireAdmin(req, reply);
-    if (!admin) return;
+    const mgr = await requireManager(req, reply);
+    if (!mgr) return;
     const { targetUserId, taskId, sessionId, body, blocksNext } = req.body ?? ({} as RaiseQuestionBody);
     if (!targetUserId || !taskId || !body) {
       return reply.code(400).send({ error: 'targetUserId_taskId_body_required' });
     }
+    if (!(await assertCanViewUser(mgr, targetUserId, reply))) return;
     const q = await prisma.question.create({
       data: {
-        adminUserId: admin.id,
+        adminUserId: mgr.id,
         targetUserId,
         taskId,
         sessionId: sessionId ?? null,
@@ -51,7 +53,7 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       },
     });
     req.log.info(
-      { audit: 'question.raised', questionId: q.id, by: admin.id, target: targetUserId, taskId, blocksNext: q.blocksNext },
+      { audit: 'question.raised', questionId: q.id, by: mgr.id, target: targetUserId, taskId, blocksNext: q.blocksNext },
       'audit',
     );
     return reply.code(201).send(toDTO(q));
@@ -77,15 +79,21 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Queue: admin sees all; dev sees own.
+  // Queue: owner all; lead own team; member own.
   app.get<{ Querystring: { status?: string } }>('/questions', async (req, reply) => {
     const user = await requireUser(req, reply);
     if (!user) return;
     const status = req.query.status as 'open' | 'answered' | undefined;
+    const scopeWhere =
+      user.role === 'admin'
+        ? {}
+        : user.role === 'lead'
+          ? { targetUser: { teamId: user.teamId ?? '__no_team__' } }
+          : { targetUserId: user.id };
     const rows = await prisma.question.findMany({
       where: {
         ...(status ? { status } : {}),
-        ...(user.role === 'admin' ? {} : { targetUserId: user.id }),
+        ...scopeWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: 100,

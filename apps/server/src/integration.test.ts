@@ -414,8 +414,8 @@ describe('authed API integration', () => {
     const devPatch = await app.inject({ method: 'PATCH', url: `/tasks/${task.id}`, headers: { cookie: outsiderCookie }, payload: { status: 'done' } });
     expect(devPatch.statusCode).toBe(403);
 
-    // directory: /users admin-only, /repos open to any signed-in user
-    expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: devCookie } })).statusCode).toBe(403);
+    // directory: /users is team-scoped (any signed-in user); /repos open too
+    expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: devCookie } })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: adminCookie } })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/repos', headers: { cookie: collabCookie } })).statusCode).toBe(200);
 
@@ -424,5 +424,52 @@ describe('authed API integration', () => {
     await prisma.taskMember.deleteMany({ where: { taskId: task.id } });
     await prisma.task.delete({ where: { id: task.id } });
     await prisma.user.deleteMany({ where: { id: { in: [collab.id, outsider.id] } } });
+  });
+
+  it('team scoping: leads see only their team; owner sees all + ?team filter', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    const mkt = await prisma.team.findUniqueOrThrow({ where: { key: 'marketing' } });
+    const mk = (role: string, teamId: string, p: string) =>
+      prisma.user.create({ data: { githubId: BigInt(uniq()), githubLogin: `${p}_${uniq()}`, role, teamId } });
+    const leadA = await mk('lead', prog.id, 'leadA');
+    const leadB = await mk('lead', mkt.id, 'leadB');
+    const devA = await mk('dev', prog.id, 'devA');
+    const devB = await mk('dev', mkt.id, 'devB');
+    // @ts-expect-error signCookie decorated by @fastify/cookie
+    const ck = (id: string) => `cad_session=${app.signCookie(id)}`;
+    const memberIds = (r: { json: () => { members: { userId: string }[] } }) => r.json().members.map((m) => m.userId);
+
+    // lead sees only their own team in the dashboard
+    const teamA = await app.inject({ method: 'GET', url: '/dashboard/team', headers: { cookie: ck(leadA.id) } });
+    expect(teamA.statusCode).toBe(200);
+    expect(memberIds(teamA)).toContain(devA.id);
+    expect(memberIds(teamA)).not.toContain(devB.id);
+
+    // lead cannot view a user outside their team; can within
+    expect((await app.inject({ method: 'GET', url: `/dashboard/user/${devB.id}/day`, headers: { cookie: ck(leadA.id) } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: `/dashboard/user/${devA.id}/day`, headers: { cookie: ck(leadA.id) } })).statusCode).toBe(200);
+
+    // a member can't reach a manager dashboard
+    expect((await app.inject({ method: 'GET', url: '/dashboard/team', headers: { cookie: ck(devA.id) } })).statusCode).toBe(403);
+
+    // owner sees all, and ?team= filters
+    const all = await app.inject({ method: 'GET', url: '/dashboard/team', headers: { cookie: adminCookie } });
+    expect(memberIds(all)).toEqual(expect.arrayContaining([devA.id, devB.id]));
+    const mktOnly = await app.inject({ method: 'GET', url: '/dashboard/team?team=marketing', headers: { cookie: adminCookie } });
+    expect(memberIds(mktOnly)).toContain(devB.id);
+    expect(memberIds(mktOnly)).not.toContain(devA.id);
+
+    // PATCH /users/:id is owner-only and promotes a lead
+    expect((await app.inject({ method: 'PATCH', url: `/users/${devA.id}`, headers: { cookie: ck(leadA.id) }, payload: { role: 'lead' } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'PATCH', url: `/users/${devB.id}`, headers: { cookie: adminCookie }, payload: { role: 'lead' } })).statusCode).toBe(200);
+
+    // a lead can't raise a question against another team's user
+    const q = await app.inject({ method: 'POST', url: '/questions', headers: { cookie: ck(leadB.id) }, payload: { targetUserId: devA.id, taskId: 'x', body: 'hi' } });
+    expect(q.statusCode).toBe(403);
+
+    await prisma.user.deleteMany({ where: { id: { in: [leadA.id, leadB.id, devA.id, devB.id] } } });
   });
 });

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '@cadence/db';
 import type { TaskStatus } from '@cadence/db';
 import type { ManagedTask, Paginated, TaskDTO } from '@cadence/shared';
-import { requireAdmin, requireUser } from '../auth/require';
+import { assertCanViewUser, managerTeamWhere, requireAdmin, requireManager, requireUser } from '../auth/require';
 import { managedTaskToDTO, taskToDTO } from '../services/map';
 import { decryptToken } from '../auth/tokenCrypto';
 import { syncUserProjects } from '../github/userSync';
@@ -72,12 +72,13 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     return toManaged(created);
   });
 
-  // Admin: list all manual/assigned tasks across the team (Tasks tab).
-  app.get<{ Querystring: { cursor?: string } }>('/tasks/managed', async (req, reply) => {
-    const admin = await requireAdmin(req, reply);
-    if (!admin) return;
+  // Managers: list manual/assigned tasks (owner = all/optional ?team; lead = own team).
+  app.get<{ Querystring: { cursor?: string; team?: string } }>('/tasks/managed', async (req, reply) => {
+    const mgr = await requireManager(req, reply);
+    if (!mgr) return;
+    const teamWhere = await managerTeamWhere(mgr, req.query.team);
     const rows = await prisma.task.findMany({
-      where: { deletedAt: null, source: 'manual' },
+      where: { deletedAt: null, source: 'manual', ...teamWhere },
       include: managedInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: PAGE + 1,
@@ -222,8 +223,13 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       const user = await requireUser(req, reply);
       if (!user) return;
 
-      // Devs see tasks they own or collaborate on; admins may target a user via ?userId.
-      const targetUserId = user.role === 'admin' && req.query.userId ? req.query.userId : user.id;
+      // Members see tasks they own or collaborate on; managers may target a
+      // viewable user via ?userId (owner: anyone; lead: own team).
+      let targetUserId = user.id;
+      if (req.query.userId && req.query.userId !== user.id) {
+        if (!(await assertCanViewUser(user, req.query.userId, reply))) return;
+        targetUserId = req.query.userId;
+      }
 
       const status = req.query.status as TaskStatus | undefined;
       const rows = await prisma.task.findMany({

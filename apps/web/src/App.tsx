@@ -18,6 +18,7 @@ import type {
   ManagedTask as ManagedTaskDTO,
   MemberLite as MemberLiteDTO,
   RepoLite as RepoLiteDTO,
+  TeamDTO as TeamDTOAlias,
 } from '@cadence/shared';
 import { activityKeysFor } from './lib/activity';
 import { api, ApiError } from './lib/api';
@@ -513,6 +514,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const teamView: 'roster' | 'day' = path.startsWith('/admin/team/day') ? 'day' : 'roster';
   const date = params.get('date') ?? todayStr();
   const isToday = date === todayStr();
+  const isOwner = me.role === 'admin';
+  // Owner-only team filter (?team=<key>); leads are team-scoped server-side.
+  const teamFilter = isOwner ? params.get('team') ?? '' : '';
+  const teamQS = teamFilter ? `&team=${teamFilter}` : '';
 
   const [team, setTeam] = useState<TeamDashboard | null>(null);
   const [teamDay, setTeamDay] = useState<TeamDayDTO | null>(null);
@@ -524,7 +529,17 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const [managedTasks, setManagedTasks] = useState<ManagedTaskDTO[] | null>(null);
   const [roster, setRoster] = useState<MemberLiteDTO[]>([]);
   const [repos, setRepos] = useState<RepoLiteDTO[]>([]);
+  const [teamsList, setTeamsList] = useState<TeamDTOAlias[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  // Owner team switcher → rewrites ?team= (preserving ?date=).
+  const setTeamFilter = (key: string) => {
+    const qs = new URLSearchParams();
+    if (date !== todayStr()) qs.set('date', date);
+    if (key) qs.set('team', key);
+    const s = qs.toString();
+    navigate(`${path}${s ? `?${s}` : ''}`);
+  };
 
   // setDate keeps the slug, writing ?date= (dropped when today).
   const setDate: React.Dispatch<React.SetStateAction<string>> = (upd) => {
@@ -535,11 +550,11 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const loadTeam = useCallback(() => {
     const from = `${date}T00:00:00.000Z`;
     const to = `${date}T23:59:59.999Z`;
-    return api<TeamDashboard>(`/dashboard/team?from=${from}&to=${to}`)
+    return api<TeamDashboard>(`/dashboard/team?from=${from}&to=${to}${teamQS}`)
       .then(setTeam)
       .catch(() => setTeam(null))
       .finally(() => setLoaded(true));
-  }, [date]);
+  }, [date, teamQS]);
 
   const loadFlags = useCallback(
     () => api<Paginated<FlagDTO>>('/flags').then((p) => setFlags(p.items)).catch(() => setFlags([])),
@@ -551,10 +566,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   );
   const loadManagedTasks = useCallback(
     () =>
-      api<Paginated<ManagedTaskDTO>>('/tasks/managed')
+      api<Paginated<ManagedTaskDTO>>(`/tasks/managed${teamFilter ? `?team=${teamFilter}` : ''}`)
         .then((p) => setManagedTasks(p.items))
         .catch(() => setManagedTasks([])),
-    [],
+    [teamFilter],
   );
 
   const loadDay = useCallback(
@@ -563,8 +578,8 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     [date],
   );
   const loadTeamDay = useCallback(
-    () => api<TeamDayDTO>(`/dashboard/team/day?date=${date}`).then(setTeamDay).catch(() => setTeamDay(null)),
-    [date],
+    () => api<TeamDayDTO>(`/dashboard/team/day?date=${date}${teamQS}`).then(setTeamDay).catch(() => setTeamDay(null)),
+    [date, teamQS],
   );
   const loadTrends = useCallback(
     (userId: string) =>
@@ -576,6 +591,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       api<ProgressDTO>(`/dashboard/user/${userId}/progress`).then(setProgress).catch(() => setProgress(null)),
     [],
   );
+
+  useEffect(() => {
+    if (isOwner) void api<TeamDTOAlias[]>('/teams').then(setTeamsList).catch(() => {});
+  }, [isOwner]);
 
   useEffect(() => {
     void loadTeam();
@@ -597,10 +616,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     if (tab === 'questions') void loadQuestions();
     if (tab === 'tasks') {
       void loadManagedTasks();
-      if (roster.length === 0) void api<MemberLiteDTO[]>('/users').then(setRoster).catch(() => {});
+      void api<MemberLiteDTO[]>(`/users${teamFilter ? `?team=${teamFilter}` : ''}`).then(setRoster).catch(() => {});
       if (repos.length === 0) void api<RepoLiteDTO[]>('/repos').then(setRepos).catch(() => {});
     }
-  }, [tab, loadFlags, loadQuestions, loadManagedTasks, roster.length, repos.length]);
+  }, [tab, loadFlags, loadQuestions, loadManagedTasks, teamFilter, repos.length]);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -682,7 +701,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Logo size={22} />
-          <span className="text-text3 font-mono text-xs truncate">admin · {me.githubLogin}</span>
+          <span className="text-text3 font-mono text-xs truncate">
+            {me.role === 'lead' ? 'lead' : 'admin'}
+            {me.teamKey ? ` · ${me.teamKey}` : ''} · {me.githubLogin}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <InstallButton />
@@ -693,10 +715,25 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       </header>
 
       <div className="px-4 sm:px-6 pt-5 max-w-6xl mx-auto w-full flex items-center gap-1.5 flex-wrap">
-        {tabBtn('team', 'Team')}
+        {tabBtn('team', 'People')}
         {tabBtn('tasks', 'Tasks')}
         {tabBtn('flags', 'Flags')}
         {tabBtn('questions', 'Questions')}
+        {isOwner && teamsList.length > 0 && (
+          <select
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            className="field h-8 px-2.5 text-xs font-mono ml-auto [color-scheme:dark]"
+            title="filter by team"
+          >
+            <option value="">all teams</option>
+            {teamsList.map((t) => (
+              <option key={t.id} value={t.key}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
@@ -797,8 +834,8 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
               </div>
               <DateNav date={date} setDate={setDate} />
               <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 flex-wrap sm:justify-end min-w-0">
-                <RunLoginCheckButton />
-                <SendDigestButton />
+                {isOwner && <RunLoginCheckButton />}
+                {isOwner && <SendDigestButton />}
                 {team && team.members.length > 0 && (
                   <button onClick={() => downloadTeamCsv(team)} className="btn btn-sm btn-ghost">
                     ↓ CSV

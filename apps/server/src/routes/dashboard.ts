@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { canViewUser, requireAdmin, requireUser } from '../auth/require';
+import {
+  assertCanViewUser,
+  managerTeamWhere,
+  requireAdmin,
+  requireManager,
+  requireUser,
+} from '../auth/require';
 import { buildDayTimeline, buildTeamDashboard, buildTeamDay, buildTrends } from '../services/dashboard';
 import { mailConfigured, verifyMail } from '../email/mailer';
 import { sendAdminDigest, sendDevDigests } from '../scripts/digest';
@@ -14,42 +20,44 @@ function parseRange(q: { from?: string; to?: string }): { start: Date; end: Date
 }
 
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
-  // Team overview (admin only).
-  app.get<{ Querystring: { from?: string; to?: string } }>(
+  // Team overview (owner = all/optional ?team; lead = own team).
+  app.get<{ Querystring: { from?: string; to?: string; team?: string } }>(
     '/dashboard/team',
     async (req, reply) => {
-      const admin = await requireAdmin(req, reply);
-      if (!admin) return;
+      const mgr = await requireManager(req, reply);
+      if (!mgr) return;
       const { start, end } = parseRange(req.query);
-      return buildTeamDashboard(start, end);
+      const where = await managerTeamWhere(mgr, req.query.team);
+      return buildTeamDashboard(start, end, where);
     },
   );
 
-  // Whole-team day on a shared axis (admin only).
-  app.get<{ Querystring: { date?: string } }>('/dashboard/team/day', async (req, reply) => {
-    const admin = await requireAdmin(req, reply);
-    if (!admin) return;
-    return buildTeamDay(admin.id, req.query.date);
+  // Whole-team day on a shared axis (owner = all/optional ?team; lead = own team).
+  app.get<{ Querystring: { date?: string; team?: string } }>('/dashboard/team/day', async (req, reply) => {
+    const mgr = await requireManager(req, reply);
+    if (!mgr) return;
+    const where = await managerTeamWhere(mgr, req.query.team);
+    return buildTeamDay(mgr.id, req.query.date, where);
   });
 
-  // Per-person day timeline (admin or self).
+  // Per-person day timeline (owner any; lead own team; member self).
   app.get<{ Params: { id: string }; Querystring: { date?: string } }>(
     '/dashboard/user/:id/day',
     async (req, reply) => {
       const user = await requireUser(req, reply);
       if (!user) return;
-      if (!canViewUser(user, req.params.id, reply)) return;
+      if (!(await assertCanViewUser(user, req.params.id, reply))) return;
       return buildDayTimeline(req.params.id, req.query.date);
     },
   );
 
-  // Longitudinal trends (admin or self).
+  // Longitudinal trends (owner any; lead own team; member self).
   app.get<{ Params: { id: string }; Querystring: { weeks?: string } }>(
     '/dashboard/user/:id/trends',
     async (req, reply) => {
       const user = await requireUser(req, reply);
       if (!user) return;
-      if (!canViewUser(user, req.params.id, reply)) return;
+      if (!(await assertCanViewUser(user, req.params.id, reply))) return;
       const weeks = req.query.weeks ? Math.min(26, Math.max(1, Number(req.query.weeks))) : 8;
       return buildTrends(req.params.id, weeks);
     },

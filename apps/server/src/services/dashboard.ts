@@ -31,10 +31,11 @@ function clip(iv: Interval, start: number, end: number): Interval {
 export async function buildTeamDashboard(
   rangeStart: Date,
   rangeEnd: Date,
+  userWhere: Record<string, unknown> = {},
 ): Promise<TeamDashboard> {
   const startMs = rangeStart.getTime();
   const endMs = rangeEnd.getTime();
-  const users = await prisma.user.findMany({ where: { deletedAt: null } });
+  const users = await prisma.user.findMany({ where: { deletedAt: null, ...userWhere } });
   const now = Date.now();
 
   const members: TeamMemberRollup[] = [];
@@ -116,7 +117,11 @@ export async function buildTeamDashboard(
  * one compact row per member. Concurrency across people is real (absolute time);
  * labels are rendered in the admin's timezone.
  */
-export async function buildTeamDay(adminUserId: string, dateArg?: string): Promise<TeamDay> {
+export async function buildTeamDay(
+  adminUserId: string,
+  dateArg?: string,
+  userWhere: Record<string, unknown> = {},
+): Promise<TeamDay> {
   const now = Date.now();
   const admin = await prisma.user.findUniqueOrThrow({ where: { id: adminUserId } });
   const tz = resolveTz(admin.timezone);
@@ -125,7 +130,10 @@ export async function buildTeamDay(adminUserId: string, dateArg?: string): Promi
   const startMs = dayStart.getTime();
   const endMs = dayEnd.getTime();
 
-  const users = await prisma.user.findMany({ where: { deletedAt: null }, orderBy: { githubLogin: 'asc' } });
+  const users = await prisma.user.findMany({
+    where: { deletedAt: null, ...userWhere },
+    orderBy: { githubLogin: 'asc' },
+  });
   const members: TeamDayMember[] = [];
   for (const u of users) {
     const sessions = await prisma.session.findMany({
