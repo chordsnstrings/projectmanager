@@ -122,8 +122,24 @@ export interface TaskDTO {
   reopenCount: number;
   /** primary owner (null if unassigned) */
   assigneeUserId: string | null;
+  /** the giver's raw task request / brief */
+  description: string | null;
+  /** AI step-by-step plan (markdown) */
+  plan: string | null;
+  /** the giver approved the plan for the assignee */
+  planApproved: boolean;
   /** origin label for the row, e.g. "#142", "PR #88", "feat/foo", "task" */
   origin: string;
+}
+
+export interface TaskCommentDTO {
+  id: string;
+  taskId: string;
+  userId: string;
+  authorLogin: string;
+  authorAvatarUrl: string | null;
+  body: string;
+  createdAt: string;
 }
 
 /** Slim user shape for assignee / collaborator pickers and avatars. */

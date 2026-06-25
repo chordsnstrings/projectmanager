@@ -9,6 +9,7 @@ import type {
 } from '@cadence/shared';
 import { fmtDuration, liveElapsed } from '../lib/format';
 import { ActivityDot, activityColor } from './activityDot';
+import TaskDiscussion from '../components/TaskDiscussion';
 
 export type TaskRowState = 'idle' | 'running' | 'wrapping';
 
@@ -128,6 +129,10 @@ export default function TaskRow({
   const wrapping = state === 'wrapping';
   const activity: ActivityType | null = session?.inferredActivity ?? null;
   const cycle = activityKeys && activityKeys.length > 0 ? activityKeys : DEFAULT_ACTIVITIES;
+  const [showDetails, setShowDetails] = useState(false);
+  // Manual tasks (and anything with a brief/plan) carry a details panel:
+  // description, the approved step-by-step, and a comment thread.
+  const hasDetails = !!(task.description || task.plan) || task.source === 'manual';
 
   // The signature 3px left edge — only on a running row, colored by activity.
   const edgeStyle =
@@ -176,6 +181,16 @@ export default function TaskRow({
 
         {/* Right: controls per state */}
         <div className="flex items-center gap-3 shrink-0">
+          {hasDetails && (
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className={`font-mono text-[11px] transition-colors ${showDetails ? 'text-brass' : 'text-text3 hover:text-text2'}`}
+              title="task brief, steps & discussion"
+            >
+              {task.planApproved ? 'steps' : 'details'} {showDetails ? '▴' : '▾'}
+            </button>
+          )}
           {running && session && (
             <>
               <button
@@ -220,6 +235,28 @@ export default function TaskRow({
           )}
         </div>
       </div>
+
+      {showDetails && hasDetails && (
+        <div className="px-4 sm:px-5 pb-4 -mt-1 flex flex-col gap-3 animate-fade-in">
+          {task.description ? (
+            <div className="flex flex-col gap-1">
+              <span className="label">brief</span>
+              <p className="text-[13px] text-text2 whitespace-pre-wrap break-words">{task.description}</p>
+            </div>
+          ) : null}
+          {task.planApproved && task.plan ? (
+            <div className="flex flex-col gap-1 rounded-lg border border-hair bg-surface/40 p-3">
+              <span className="label">your steps</span>
+              <div className="text-[13px] text-text2 whitespace-pre-wrap break-words leading-relaxed font-mono">{task.plan}</div>
+            </div>
+          ) : task.plan && !task.planApproved ? (
+            <div className="font-mono text-[11px] text-text3">Steps are being prepared — pending approval.</div>
+          ) : null}
+          <div className="border-t border-hair pt-3">
+            <TaskDiscussion taskId={task.id} />
+          </div>
+        </div>
+      )}
 
       {wrapping && session && draft && (
         <WrapPanel

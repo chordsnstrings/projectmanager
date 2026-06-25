@@ -60,6 +60,12 @@ export const env = {
   MAX_OPEN_HOURS: num('MAX_OPEN_HOURS', 8),
   OVERRUN_FACTOR: num('OVERRUN_FACTOR', 1.5),
 
+  // DeepSeek (AI task step-breakdown). Optional: when DEEPSEEK_API_KEY is unset
+  // the plan-generation endpoint returns 503. OpenAI-compatible chat completions.
+  DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? '',
+  DEEPSEEK_MODEL: process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-pro',
+  DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com',
+
   get isProd() {
     return this.NODE_ENV === 'production';
   },

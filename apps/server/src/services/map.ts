@@ -42,6 +42,9 @@ export function taskToDTO(
     actualMinutes: actualMinutes(t.sessions),
     reopenCount: t.reopenCount,
     assigneeUserId: t.assigneeUserId,
+    description: t.description,
+    plan: t.plan,
+    planApproved: t.planApproved,
     origin: taskOrigin(t),
   };
 }

@@ -91,6 +91,7 @@ model User {
   emails      UserEmail[]
   sessions    Session[]
   taskMemberships TaskMember[]
+  taskComments TaskComment[]
   flags       Flag[]
   questions   Question[]  @relation("QuestionTarget")
   createdAt   DateTime    @default(now())
@@ -146,6 +147,11 @@ model Task {
   teamId          String? // set for manual tasks; git tasks derive team from the assignee
   team            Team?   @relation(fields: [teamId], references: [id])
   estimateMinutes Int? // §7
+  description     String? // the giver's raw task request / brief
+  plan            String? // AI-generated step-by-step (markdown), editable
+  planApproved    Boolean   @default(false) // the giver approved the plan for the assignee
+  planApprovedById String?
+  planApprovedAt  DateTime?
   milestoneTitle  String? // GitHub milestone (often a version, e.g. "v1.2") — completion grouping
   milestoneDueOn  DateTime?
   reopenCount     Int        @default(0)
@@ -156,10 +162,25 @@ model Task {
   sessions        Session[]
   gitEvents       GitEvent[]
   members         TaskMember[]
+  comments        TaskComment[]
 
   @@unique([repoId, source, githubNumber, branch])
   @@index([assigneeUserId, status])
   @@index([teamId, source, assigneeUserId])
+}
+
+// A discussion comment on a task (giver ↔ receiver back-and-forth).
+model TaskComment {
+  id        String    @id @default(cuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([taskId, createdAt])
 }
 
 // Additional collaborators on a task (the primary owner is Task.assigneeUserId).

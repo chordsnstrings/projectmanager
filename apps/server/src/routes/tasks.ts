@@ -1,15 +1,42 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '@cadence/db';
 import type { TaskStatus } from '@cadence/db';
-import type { ManagedTask, Paginated, TaskDTO } from '@cadence/shared';
+import type { AuthUser } from '../auth/require';
+import type { ManagedTask, Paginated, TaskCommentDTO, TaskDTO } from '@cadence/shared';
 import { assertCanViewUser, managerTeamWhere, requireManager, requireUser } from '../auth/require';
 import { managedTaskToDTO, taskToDTO } from '../services/map';
 import { decryptToken } from '../auth/tokenCrypto';
 import { syncUserProjects } from '../github/userSync';
 import { autoStopOnCommit } from '../engine/reconcileFlags';
 import { createBranch, CreateBranchError, slugBranch } from '../github/createBranch';
+import { aiConfigured, AiError, generateTaskPlan } from '../ai/deepseek';
 
 const PAGE = 50;
+
+// Who can see / comment on a task: admin, lead of its team, the assignee, a
+// collaborator, or the creator.
+function canAccessTask(
+  user: AuthUser,
+  task: { teamId: string | null; assigneeUserId: string | null; createdByUserId: string | null; members: { userId: string }[] },
+): boolean {
+  if (user.role === 'admin') return true;
+  if (user.role === 'lead' && task.teamId && task.teamId === user.teamId) return true;
+  if (task.assigneeUserId === user.id || task.createdByUserId === user.id) return true;
+  return task.members.some((m) => m.userId === user.id);
+}
+
+// Manager of the task's team (admin, or lead of that team) or the task's creator
+// — who may generate/edit/approve the plan.
+function canManagePlan(
+  user: AuthUser,
+  task: { teamId: string | null; createdByUserId: string | null },
+): boolean {
+  return (
+    user.role === 'admin' ||
+    (user.role === 'lead' && !!task.teamId && task.teamId === user.teamId) ||
+    task.createdByUserId === user.id
+  );
+}
 const STATUSES: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done'];
 
 // Shared include for ManagedTask responses (repo + sessions + collaborators).
@@ -44,6 +71,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: {
       title?: string;
+      description?: string | null;
       assigneeUserId?: string | null;
       collaboratorIds?: string[];
       estimateMinutes?: number | null;
@@ -79,6 +107,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         repoId: null,
         teamId: actor.teamId,
         title: title.slice(0, 200),
+        description: req.body?.description?.trim() ? req.body.description.trim().slice(0, 4000) : null,
         status,
         assigneeUserId,
         createdByUserId: actor.id,
@@ -157,6 +186,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: {
       title?: string | null;
+      description?: string | null;
       status?: TaskStatus;
       estimateMinutes?: number | null;
       assigneeUserId?: string | null;
@@ -178,6 +208,9 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const b = req.body ?? {};
     if (b.title !== undefined) {
       data.displayTitle = b.title && b.title.trim() ? b.title.trim().slice(0, 200) : null;
+    }
+    if (b.description !== undefined) {
+      data.description = b.description && b.description.trim() ? b.description.trim().slice(0, 4000) : null;
     }
     if (b.status !== undefined && STATUSES.includes(b.status)) {
       data.status = b.status;
@@ -217,6 +250,112 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     await prisma.task.update({ where: { id: task.id }, data: { deletedAt: new Date() } });
     req.log.info({ audit: 'task.archived', taskId: task.id, by: user.id }, 'audit');
     return { ok: true, id: task.id };
+  });
+
+  // Generate a step-by-step plan from the task's description via DeepSeek. Saves
+  // it as an unapproved draft. Manager-of-team or creator only.
+  app.post<{ Params: { id: string } }>('/tasks/:id/plan', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    if (!aiConfigured()) return reply.code(503).send({ error: 'ai_not_configured' });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+    if (!canManagePlan(user, task)) return reply.code(403).send({ error: 'forbidden' });
+    if (!task.description?.trim()) return reply.code(400).send({ error: 'description_required' });
+    try {
+      const plan = await generateTaskPlan({ title: task.displayTitle ?? task.title, description: task.description });
+      const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: { plan, planApproved: false, planApprovedById: null, planApprovedAt: null },
+        include: managedInclude,
+      });
+      req.log.info({ audit: 'task.plan.generated', taskId: task.id, by: user.id }, 'audit');
+      return toManaged(updated);
+    } catch (err) {
+      const code = err instanceof AiError ? err.code : 'ai_failed';
+      req.log.warn({ err, taskId: task.id }, 'plan generation failed');
+      return reply.code(502).send({ error: code });
+    }
+  });
+
+  // Edit and/or approve the plan (manager-of-team or creator). Approval is the
+  // gate that tells the assignee the steps are final.
+  app.patch<{ Params: { id: string }; Body: { plan?: string | null; approved?: boolean } }>(
+    '/tasks/:id/plan',
+    async (req, reply) => {
+      const user = await requireUser(req, reply);
+      if (!user) return;
+      const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
+      if (!task) return reply.code(404).send({ error: 'task_not_found' });
+      if (!canManagePlan(user, task)) return reply.code(403).send({ error: 'forbidden' });
+      const data: Record<string, unknown> = {};
+      if (req.body?.plan !== undefined) {
+        data.plan = req.body.plan && req.body.plan.trim() ? req.body.plan.slice(0, 8000) : null;
+      }
+      if (req.body?.approved !== undefined) {
+        data.planApproved = !!req.body.approved;
+        data.planApprovedById = req.body.approved ? user.id : null;
+        data.planApprovedAt = req.body.approved ? new Date() : null;
+      }
+      const updated = await prisma.task.update({ where: { id: task.id }, data, include: managedInclude });
+      req.log.info({ audit: 'task.plan.updated', taskId: task.id, by: user.id, approved: updated.planApproved }, 'audit');
+      return toManaged(updated);
+    },
+  );
+
+  // Comments on a task (giver ↔ receiver). Anyone who can access the task.
+  app.get<{ Params: { id: string } }>('/tasks/:id/comments', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      include: { members: { where: { deletedAt: null }, select: { userId: true } } },
+    });
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+    if (!canAccessTask(user, task)) return reply.code(403).send({ error: 'forbidden' });
+    const rows = await prisma.taskComment.findMany({
+      where: { taskId: task.id, deletedAt: null },
+      include: { user: { select: { githubLogin: true, avatarUrl: true } } },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+    const items: TaskCommentDTO[] = rows.map((c) => ({
+      id: c.id,
+      taskId: c.taskId,
+      userId: c.userId,
+      authorLogin: c.user.githubLogin,
+      authorAvatarUrl: c.user.avatarUrl,
+      body: c.body,
+      createdAt: c.createdAt.toISOString(),
+    }));
+    return items;
+  });
+
+  app.post<{ Params: { id: string }; Body: { body?: string } }>('/tasks/:id/comments', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+      include: { members: { where: { deletedAt: null }, select: { userId: true } } },
+    });
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+    if (!canAccessTask(user, task)) return reply.code(403).send({ error: 'forbidden' });
+    const body = req.body?.body?.trim();
+    if (!body) return reply.code(400).send({ error: 'body_required' });
+    const c = await prisma.taskComment.create({
+      data: { taskId: task.id, userId: user.id, body: body.slice(0, 4000) },
+      include: { user: { select: { githubLogin: true, avatarUrl: true } } },
+    });
+    const dto: TaskCommentDTO = {
+      id: c.id,
+      taskId: c.taskId,
+      userId: c.userId,
+      authorLogin: c.user.githubLogin,
+      authorAvatarUrl: c.user.avatarUrl,
+      body: c.body,
+      createdAt: c.createdAt.toISOString(),
+    };
+    return reply.code(201).send(dto);
   });
 
   // "Create the git": make a branch in a connected repo and link it to the task.

@@ -24,6 +24,9 @@ const tasks: TaskDTO[] = [
     actualMinutes: 96,
     reopenCount: 0,
     assigneeUserId: null,
+    description: null,
+    plan: null,
+    planApproved: false,
     origin: '#142',
   },
   {
@@ -38,6 +41,9 @@ const tasks: TaskDTO[] = [
     actualMinutes: 74,
     reopenCount: 1,
     assigneeUserId: null,
+    description: null,
+    plan: null,
+    planApproved: false,
     origin: 'PR #88',
   },
   {
@@ -52,6 +58,9 @@ const tasks: TaskDTO[] = [
     actualMinutes: 22,
     reopenCount: 0,
     assigneeUserId: null,
+    description: null,
+    plan: null,
+    planApproved: false,
     origin: 'feat/foo',
   },
   {
@@ -66,6 +75,9 @@ const tasks: TaskDTO[] = [
     actualMinutes: 0,
     reopenCount: 0,
     assigneeUserId: null,
+    description: null,
+    plan: null,
+    planApproved: false,
     origin: '#201',
   },
 ];

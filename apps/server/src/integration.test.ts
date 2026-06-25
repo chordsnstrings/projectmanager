@@ -527,6 +527,47 @@ describe('authed API integration', () => {
     await prisma.user.delete({ where: { id: stranger.id } });
   });
 
+  it('task brief + comments + AI plan gate/approval', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
+    const outsider = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `o_${uniq()}`, role: 'dev', teamId: prog.id },
+    });
+    // @ts-expect-error signCookie decorated by @fastify/cookie
+    const oc = `cad_session=${app.signCookie(outsider.id)}`;
+
+    // create with a brief, assigned to dev
+    const created = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: adminCookie }, payload: { title: 'Write copy', description: 'Need landing hero copy', assigneeUserId: devId } });
+    expect(created.statusCode).toBe(200);
+    const id = created.json().id;
+    expect(created.json().description).toBe('Need landing hero copy');
+
+    // assignee comments; both giver + receiver can read; an outsider can't
+    expect((await app.inject({ method: 'POST', url: `/tasks/${id}/comments`, headers: { cookie: devCookie }, payload: { body: 'On it' } })).statusCode).toBe(201);
+    const list = await app.inject({ method: 'GET', url: `/tasks/${id}/comments`, headers: { cookie: adminCookie } });
+    expect(list.json().length).toBe(1);
+    expect(list.json()[0].body).toBe('On it');
+    expect((await app.inject({ method: 'GET', url: `/tasks/${id}/comments`, headers: { cookie: oc } })).statusCode).toBe(403);
+
+    // plan generation is gated on DeepSeek being configured (it isn't in tests)
+    expect((await app.inject({ method: 'POST', url: `/tasks/${id}/plan`, headers: { cookie: adminCookie }, payload: {} })).statusCode).toBe(503);
+
+    // a manager can set + approve a plan directly (the approval gate)
+    const setp = await app.inject({ method: 'PATCH', url: `/tasks/${id}/plan`, headers: { cookie: adminCookie }, payload: { plan: '1. do it', approved: true } });
+    expect(setp.statusCode).toBe(200);
+    expect(setp.json().plan).toBe('1. do it');
+    expect(setp.json().planApproved).toBe(true);
+    // the receiver can't approve/edit the plan
+    expect((await app.inject({ method: 'PATCH', url: `/tasks/${id}/plan`, headers: { cookie: devCookie }, payload: { approved: false } })).statusCode).toBe(403);
+
+    await prisma.taskComment.deleteMany({ where: { taskId: id } });
+    await prisma.task.delete({ where: { id } });
+    await prisma.user.delete({ where: { id: outsider.id } });
+  });
+
   it('team scoping: leads see only their team; owner sees all + ?team filter', async () => {
     if (!available) return;
     const { seedTeams } = await import('./scripts/seed-teams');

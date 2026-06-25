@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ManagedTask, MemberLite, RepoLite, TaskStatus } from '@cadence/shared';
 import { api } from '../lib/api';
 import { fmtDuration } from '../lib/format';
+import TaskDiscussion from '../components/TaskDiscussion';
 
 const STATUSES: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done'];
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -82,6 +83,7 @@ function CreateTask({
   const [assigneeId, setAssigneeId] = useState('');
   const [collabs, setCollabs] = useState<Set<string>>(new Set());
   const [estimate, setEstimate] = useState('');
+  const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -91,6 +93,7 @@ function CreateTask({
       method: 'POST',
       body: JSON.stringify({
         title: title.trim(),
+        description: description.trim() || null,
         assigneeUserId: assigneeId || undefined,
         collaboratorIds: [...collabs],
         estimateMinutes: estimate ? Math.max(0, Math.round(Number(estimate))) : null,
@@ -109,6 +112,13 @@ function CreateTask({
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Task title"
         className="field h-9 px-3 text-sm"
+      />
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Describe the task / what needs doing (the AI will turn this into steps)…"
+        rows={3}
+        className="field px-3 py-2 text-sm resize-y"
       />
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1">
@@ -169,9 +179,13 @@ function TaskRow({
   const [assigneeId, setAssigneeId] = useState(task.assigneeUserId ?? '');
   const [collabs, setCollabs] = useState<Set<string>>(new Set(task.members.map((m) => m.id)));
   const [estimate, setEstimate] = useState(task.estimateMinutes != null ? String(task.estimateMinutes) : '');
+  const [description, setDescription] = useState(task.description ?? '');
+  const [plan, setPlan] = useState(task.plan ?? '');
   const [repoId, setRepoId] = useState('');
   const [branch, setBranch] = useState('');
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiErr, setAiErr] = useState<string | null>(null);
   const [gitErr, setGitErr] = useState<string | null>(null);
 
   const save = async () => {
@@ -180,6 +194,7 @@ function TaskRow({
       method: 'PATCH',
       body: JSON.stringify({
         status,
+        description: description.trim() || null,
         assigneeUserId: assigneeId || null,
         collaboratorIds: [...collabs],
         estimateMinutes: estimate ? Math.max(0, Math.round(Number(estimate))) : null,
@@ -188,6 +203,32 @@ function TaskRow({
     setBusy(false);
     onChanged();
     setOpen(false);
+  };
+
+  const generatePlan = async () => {
+    if (aiBusy) return;
+    setAiBusy(true);
+    setAiErr(null);
+    // Persist the latest description first so the AI sees it.
+    await api(`/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify({ description: description.trim() || null }) }).catch(() => {});
+    try {
+      const updated = await api<ManagedTask>(`/tasks/${task.id}/plan`, { method: 'POST', body: '{}' });
+      setPlan(updated.plan ?? '');
+      onChanged();
+    } catch {
+      setAiErr('Could not generate steps — is DeepSeek configured? Add a description first.');
+    }
+    setAiBusy(false);
+  };
+
+  const savePlan = async (approved?: boolean) => {
+    setAiBusy(true);
+    await api(`/tasks/${task.id}/plan`, {
+      method: 'PATCH',
+      body: JSON.stringify({ plan: plan.trim() || null, ...(approved !== undefined ? { approved } : {}) }),
+    }).catch(() => {});
+    setAiBusy(false);
+    onChanged();
   };
 
   const createBranch = async () => {
@@ -230,6 +271,48 @@ function TaskRow({
 
       {open && (
         <div className="px-4 pb-4 pt-1 flex flex-col gap-3 animate-fade-in">
+          {/* Description → AI step-by-step plan → approval */}
+          <div className="flex flex-col gap-1">
+            <span className="label">description / brief</span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What needs doing? The AI turns this into clear steps."
+              rows={3}
+              className="field px-3 py-2 text-sm resize-y"
+            />
+          </div>
+
+          <div className="rounded-lg border border-hair bg-surface/40 p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="label">step-by-step plan {task.planApproved && <span className="text-success">· approved</span>}</span>
+              <button type="button" onClick={generatePlan} disabled={aiBusy} className="font-mono text-[11px] text-brass hover:text-brass/80 disabled:opacity-50">
+                {aiBusy ? 'thinking…' : plan ? '↻ regenerate' : '✨ generate steps'}
+              </button>
+            </div>
+            {aiErr && <span className="font-mono text-[11px] text-danger">{aiErr}</span>}
+            {plan ? (
+              <>
+                <textarea
+                  value={plan}
+                  onChange={(e) => setPlan(e.target.value)}
+                  rows={Math.min(16, Math.max(5, plan.split('\n').length + 1))}
+                  className="field px-3 py-2 text-[13px] font-mono resize-y leading-relaxed"
+                />
+                <div className="flex items-center gap-2 justify-end">
+                  <button type="button" onClick={() => savePlan()} disabled={aiBusy} className="btn btn-sm btn-ghost">Save plan</button>
+                  {task.planApproved ? (
+                    <button type="button" onClick={() => savePlan(false)} disabled={aiBusy} className="btn btn-sm btn-ghost text-text3">Unapprove</button>
+                  ) : (
+                    <button type="button" onClick={() => savePlan(true)} disabled={aiBusy} className="btn btn-sm btn-primary">Approve for assignee</button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <span className="font-mono text-[11px] text-text3">No plan yet — add a description and generate steps.</span>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-3">
             <label className="flex flex-col gap-1">
               <span className="label">status</span>
@@ -287,6 +370,10 @@ function TaskRow({
               {gitErr && <span className="font-mono text-[11px] text-danger">{gitErr}</span>}
             </div>
           )}
+
+          <div className="border-t border-hair pt-3">
+            <TaskDiscussion taskId={task.id} />
+          </div>
 
           <div className="flex items-center gap-2 justify-end">
             <button
