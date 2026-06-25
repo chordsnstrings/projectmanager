@@ -478,6 +478,38 @@ describe('authed API integration', () => {
     await prisma.user.deleteMany({ where: { id: { in: [a1.id, a2.id, b1.id] } } });
   });
 
+  it('archive: assignee/manager can soft-delete a task; strangers cannot', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
+    const stranger = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `s_${uniq()}`, role: 'dev', teamId: prog.id },
+    });
+    // @ts-expect-error signCookie decorated by @fastify/cookie
+    const ck = (id: string) => `cad_session=${app.signCookie(id)}`;
+
+    const created = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: adminCookie }, payload: { title: 'archive me', assigneeUserId: devId } });
+    const id = created.json().id;
+
+    // a stranger (not manager/assignee/creator) cannot archive
+    expect((await app.inject({ method: 'DELETE', url: `/tasks/${id}`, headers: { cookie: ck(stranger.id) } })).statusCode).toBe(403);
+
+    // the assignee can
+    const del = await app.inject({ method: 'DELETE', url: `/tasks/${id}`, headers: { cookie: devCookie } });
+    expect(del.statusCode).toBe(200);
+    expect(del.json().ok).toBe(true);
+
+    // gone from the managed list, and a second archive 404s
+    const managed = await app.inject({ method: 'GET', url: '/tasks/managed', headers: { cookie: adminCookie } });
+    expect(managed.json().items.some((t: { id: string }) => t.id === id)).toBe(false);
+    expect((await app.inject({ method: 'DELETE', url: `/tasks/${id}`, headers: { cookie: adminCookie } })).statusCode).toBe(404);
+
+    await prisma.task.deleteMany({ where: { id } });
+    await prisma.user.delete({ where: { id: stranger.id } });
+  });
+
   it('team scoping: leads see only their team; owner sees all + ?team filter', async () => {
     if (!available) return;
     const { seedTeams } = await import('./scripts/seed-teams');

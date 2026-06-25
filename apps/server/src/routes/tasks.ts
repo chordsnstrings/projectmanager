@@ -201,6 +201,24 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     return toManaged(updated);
   });
 
+  // Archive (soft-delete) a task. A team manager (admin, or lead of the task's
+  // team), the assignee, or the creator may archive. Note: a git-synced task
+  // (issue/pr/branch) will reappear on the next GitHub sync — archive is durable
+  // only for manual tasks.
+  app.delete<{ Params: { id: string } }>('/tasks/:id', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+    const isManager = user.role === 'admin' || (user.role === 'lead' && !!task.teamId && task.teamId === user.teamId);
+    if (!isManager && task.assigneeUserId !== user.id && task.createdByUserId !== user.id) {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
+    await prisma.task.update({ where: { id: task.id }, data: { deletedAt: new Date() } });
+    req.log.info({ audit: 'task.archived', taskId: task.id, by: user.id }, 'audit');
+    return { ok: true, id: task.id };
+  });
+
   // "Create the git": make a branch in a connected repo and link it to the task.
   app.post<{ Params: { id: string }; Body: { repoId?: string; branch?: string } }>(
     '/tasks/:id/git',

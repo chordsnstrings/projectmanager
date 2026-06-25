@@ -289,6 +289,19 @@ function TaskRow({
           )}
 
           <div className="flex items-center gap-2 justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                if (busy || !confirm('Archive this task? It will be removed from the board.')) return;
+                setBusy(true);
+                await api(`/tasks/${task.id}`, { method: 'DELETE' }).catch(() => {});
+                setBusy(false);
+                onChanged();
+              }}
+              className="btn btn-sm border-danger/40 text-danger hover:bg-danger/10 mr-auto"
+            >
+              Archive
+            </button>
             <button type="button" onClick={() => setOpen(false)} className="btn btn-sm btn-ghost">close</button>
             <button type="button" onClick={save} disabled={busy} className="btn btn-sm btn-primary">{busy ? 'saving…' : 'Save'}</button>
           </div>
