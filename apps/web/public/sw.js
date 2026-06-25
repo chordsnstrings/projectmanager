@@ -2,7 +2,7 @@
 // installability criteria. Deliberately simple: it never caches API/auth
 // responses (always live data), serves hashed build assets cache-first, and
 // falls back to the cached shell for navigations when offline.
-const VERSION = 'cadence-v1';
+const VERSION = 'cadence-v2';
 const SHELL = `${VERSION}-shell`;
 const ASSETS = `${VERSION}-assets`;
 
@@ -17,6 +17,11 @@ self.addEventListener('install', (event) => {
     caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/favicon.svg', '/app-icon.svg'])).catch(() => {}),
   );
   self.skipWaiting();
+});
+
+// The page asks the waiting worker to activate immediately (on user "Reload").
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {

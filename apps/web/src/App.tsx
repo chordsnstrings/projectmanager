@@ -28,6 +28,7 @@ import { Logo } from './components/Logo';
 import InstallButton from './components/InstallButton';
 import Onboarding from './Onboarding';
 import UpdateModal from './UpdateModal';
+import UpdateToast from './UpdateToast';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -126,6 +127,7 @@ export default function App() {
     <>
       {screen}
       <UpdateModal me={auth.me} onAck={ackVersion} />
+      <UpdateToast />
     </>
   );
 }
