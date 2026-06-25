@@ -98,8 +98,11 @@ Be conservative: only mark ready:false when real, important information is missi
           { role: 'user', content: user },
         ],
         temperature: 0.1,
-        max_tokens: 500,
+        max_tokens: 1500,
         response_format: { type: 'json_object' },
+        // Fast structured verdict — no chain-of-thought needed (and reasoning
+        // tokens would otherwise eat the budget and truncate the JSON).
+        thinking: { type: 'disabled' },
         stream: false,
       }),
     });

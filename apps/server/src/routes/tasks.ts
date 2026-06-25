@@ -364,8 +364,21 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
     if (!task) return reply.code(404).send({ error: 'task_not_found' });
     if (!canManagePlan(user, task)) return reply.code(403).send({ error: 'forbidden' });
-    await ensureReadiness(task, { force: true });
-    return toManaged(await loadManaged(task.id));
+    const desc = task.description?.trim() ?? '';
+    if (!desc) {
+      await ensureReadiness(task, { force: true });
+      return toManaged(await loadManaged(task.id));
+    }
+    try {
+      const team = task.teamId ? await prisma.team.findUnique({ where: { id: task.teamId }, select: { key: true } }) : null;
+      const v = await assessTaskReadiness({ title: task.displayTitle ?? task.title, description: desc, teamKey: team?.key ?? null });
+      await storeReadiness(task.id, v, descHash(desc));
+      return toManaged(await loadManaged(task.id));
+    } catch (err) {
+      const code = err instanceof AiError ? err.code : 'ai_failed';
+      req.log.warn({ err, taskId: task.id }, 'readiness check failed');
+      return reply.code(502).send({ error: code });
+    }
   });
 
   // Edit and/or approve the plan (manager-of-team or creator). Approval is the
