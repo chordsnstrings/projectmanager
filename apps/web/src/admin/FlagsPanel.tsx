@@ -67,8 +67,18 @@ function FlagRow({
         <div className="min-w-0 flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <TypeBadge type={flag.type} />
+            {flag.userLogin ? (
+              <span className="font-mono text-[11px] text-text2">@{flag.userLogin}</span>
+            ) : null}
             <span className="font-mono text-[11px] text-text3">{relativeTime(flag.createdAt)}</span>
           </div>
+          {flag.taskTitle ? (
+            <div className="font-mono text-[11px] text-text3 truncate">
+              {flag.taskOrigin ? `${flag.taskOrigin} · ` : ''}
+              <span className="text-text2">{flag.taskTitle}</span>
+              {flag.repoFullName ? ` · ${flag.repoFullName}` : ''}
+            </div>
+          ) : null}
           <p className="text-sm text-text2 leading-relaxed break-words">{flag.detail}</p>
         </div>
 

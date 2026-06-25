@@ -32,6 +32,14 @@ function OpenQuestion({
         </span>
       </div>
 
+      {question.taskTitle ? (
+        <div className="font-mono text-[11px] text-text3 truncate -mt-1">
+          re: {question.taskOrigin ? `${question.taskOrigin} · ` : ''}
+          <span className="text-text2">{question.taskTitle}</span>
+          {question.repoFullName ? ` · ${question.repoFullName}` : ''}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
           type="text"

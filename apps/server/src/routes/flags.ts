@@ -2,8 +2,54 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '@cadence/db';
 import type { FlagDTO, Paginated } from '@cadence/shared';
 import { assertCanViewUser, requireManager, requireUser } from '../auth/require';
+import { taskDisplayTitle, taskOrigin } from '../services/map';
 
 const PAGE = 50;
+
+const taskCtxSelect = {
+  displayTitle: true,
+  title: true,
+  source: true,
+  githubNumber: true,
+  branch: true,
+  repo: { select: { fullName: true } },
+} as const;
+type TaskCtx = {
+  displayTitle: string | null;
+  title: string;
+  source: 'issue' | 'pr' | 'branch' | 'manual';
+  githubNumber: number | null;
+  branch: string | null;
+  repo: { fullName: string } | null;
+};
+
+type FlagRow = {
+  id: string;
+  type: FlagDTO['type'];
+  userId: string;
+  sessionId: string | null;
+  taskId: string | null;
+  detail: string;
+  status: FlagDTO['status'];
+  createdAt: Date;
+};
+
+function flagToDTO(f: FlagRow, userLogin: string | null, task: TaskCtx | null): FlagDTO {
+  return {
+    id: f.id,
+    type: f.type,
+    userId: f.userId,
+    userLogin,
+    sessionId: f.sessionId,
+    taskId: f.taskId,
+    taskTitle: task ? taskDisplayTitle(task) : null,
+    taskOrigin: task ? taskOrigin(task) : null,
+    repoFullName: task?.repo?.fullName ?? null,
+    detail: f.detail,
+    status: f.status,
+    createdAt: f.createdAt.toISOString(),
+  };
+}
 
 export async function flagRoutes(app: FastifyInstance): Promise<void> {
   // Resolve / dismiss / reopen a flag (owner any; lead own team). Advisory, never blocking.
@@ -25,17 +71,11 @@ export async function flagRoutes(app: FastifyInstance): Promise<void> {
         data: { status, resolvedAt: status === 'open' ? null : new Date() },
       });
       req.log.info({ audit: 'flag.status', flagId: flag.id, status, by: mgr.id }, 'audit');
-      const dto: FlagDTO = {
-        id: updated.id,
-        type: updated.type,
-        userId: updated.userId,
-        sessionId: updated.sessionId,
-        taskId: updated.taskId,
-        detail: updated.detail,
-        status: updated.status,
-        createdAt: updated.createdAt.toISOString(),
-      };
-      return dto;
+      const u = await prisma.user.findUnique({ where: { id: updated.userId }, select: { githubLogin: true } });
+      const task = updated.taskId
+        ? await prisma.task.findUnique({ where: { id: updated.taskId }, select: taskCtxSelect })
+        : null;
+      return flagToDTO(updated, u?.githubLogin ?? null, task);
     },
   );
 
@@ -59,16 +99,20 @@ export async function flagRoutes(app: FastifyInstance): Promise<void> {
       take: PAGE + 1,
       ...(req.query.cursor ? { cursor: { id: req.query.cursor }, skip: 1 } : {}),
     });
-    const items: FlagDTO[] = rows.slice(0, PAGE).map((f) => ({
-      id: f.id,
-      type: f.type,
-      userId: f.userId,
-      sessionId: f.sessionId,
-      taskId: f.taskId,
-      detail: f.detail,
-      status: f.status,
-      createdAt: f.createdAt.toISOString(),
-    }));
+    const page = rows.slice(0, PAGE);
+    const userIds = [...new Set(page.map((f) => f.userId))];
+    const taskIds = [...new Set(page.map((f) => f.taskId).filter(Boolean) as string[])];
+    const [users, tasks] = await Promise.all([
+      prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, githubLogin: true } }),
+      taskIds.length
+        ? prisma.task.findMany({ where: { id: { in: taskIds } }, select: { id: true, ...taskCtxSelect } })
+        : Promise.resolve([]),
+    ]);
+    const loginById = new Map(users.map((u) => [u.id, u.githubLogin]));
+    const taskById = new Map(tasks.map((t) => [t.id, t]));
+    const items: FlagDTO[] = page.map((f) =>
+      flagToDTO(f, loginById.get(f.userId) ?? null, f.taskId ? taskById.get(f.taskId) ?? null : null),
+    );
     const nextCursor = rows.length > PAGE ? (rows[PAGE]?.id ?? null) : null;
     const body: Paginated<FlagDTO> = { items, nextCursor };
     return body;

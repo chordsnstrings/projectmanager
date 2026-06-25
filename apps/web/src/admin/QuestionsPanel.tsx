@@ -33,6 +33,14 @@ function QuestionRow({ q }: { q: QuestionDTO }) {
         </span>
       </div>
 
+      {q.taskTitle ? (
+        <div className="font-mono text-[11px] text-text3 truncate">
+          re: {q.taskOrigin ? `${q.taskOrigin} · ` : ''}
+          <span className="text-text2">{q.taskTitle}</span>
+          {q.repoFullName ? ` · ${q.repoFullName}` : ''}
+        </div>
+      ) : null}
+
       <p className="text-sm text-text leading-relaxed break-words">{q.body}</p>
 
       {q.status === 'answered' && q.answer != null ? (

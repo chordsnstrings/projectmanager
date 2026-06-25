@@ -14,7 +14,7 @@ import type {
   TrendPoint,
 } from '@cadence/shared';
 import { groupedTaskMinutes, sumMinutes, unionMinutes, type Interval } from '../engine/sessionMath';
-import { taskOrigin } from './map';
+import { taskDisplayTitle, taskOrigin } from './map';
 import { localDayRange, localToday, resolveTz } from '../lib/tz';
 
 function median(xs: number[]): number | null {
@@ -225,6 +225,20 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
     },
     orderBy: { createdAt: 'desc' },
   });
+  // Task context for labelling each flag/question with what it's about.
+  const ctxTaskIds = [
+    ...new Set([
+      ...dayQuestions.map((q) => q.taskId),
+      ...(dayFlags.map((f) => f.taskId).filter(Boolean) as string[]),
+    ]),
+  ];
+  const ctxTasks = ctxTaskIds.length
+    ? await prisma.task.findMany({
+        where: { id: { in: ctxTaskIds } },
+        select: { id: true, displayTitle: true, title: true, source: true, githubNumber: true, branch: true, repo: { select: { fullName: true } } },
+      })
+    : [];
+  const qTaskById = new Map(ctxTasks.map((t) => [t.id, t]));
   const questionsBySession = new Map<string, string[]>();
   for (const q of dayQuestions) {
     if (q.sessionId) {
@@ -328,31 +342,42 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
     // overlap does not.
     taskHoursMinutes: lanes.reduce((acc, l) => acc + l.actualMinutes, 0),
     sessionCount: sessions.length,
-    flags: dayFlags.map(
-      (f): FlagDTO => ({
+    flags: dayFlags.map((f): FlagDTO => {
+      const t = f.taskId ? qTaskById.get(f.taskId) : null;
+      return {
         id: f.id,
         type: f.type,
         userId: f.userId,
+        userLogin: user.githubLogin,
         sessionId: f.sessionId,
         taskId: f.taskId,
+        taskTitle: t ? taskDisplayTitle(t) : null,
+        taskOrigin: t ? taskOrigin(t) : null,
+        repoFullName: t?.repo?.fullName ?? null,
         detail: f.detail,
         status: f.status,
         createdAt: f.createdAt.toISOString(),
-      }),
-    ),
-    questions: dayQuestions.map((q) => ({
-      id: q.id,
-      adminUserId: q.adminUserId,
-      targetUserId: q.targetUserId,
-      taskId: q.taskId,
-      sessionId: q.sessionId,
-      body: q.body,
-      blocksNext: q.blocksNext,
-      status: q.status,
-      answer: q.answer,
-      createdAt: q.createdAt.toISOString(),
-      answeredAt: q.answeredAt ? q.answeredAt.toISOString() : null,
-    })),
+      };
+    }),
+    questions: dayQuestions.map((q) => {
+      const t = qTaskById.get(q.taskId);
+      return {
+        id: q.id,
+        adminUserId: q.adminUserId,
+        targetUserId: q.targetUserId,
+        taskId: q.taskId,
+        taskTitle: t ? taskDisplayTitle(t) : null,
+        taskOrigin: t ? taskOrigin(t) : null,
+        repoFullName: t?.repo?.fullName ?? null,
+        sessionId: q.sessionId,
+        body: q.body,
+        blocksNext: q.blocksNext,
+        status: q.status,
+        answer: q.answer,
+        createdAt: q.createdAt.toISOString(),
+        answeredAt: q.answeredAt ? q.answeredAt.toISOString() : null,
+      };
+    }),
     lanes,
   };
 }

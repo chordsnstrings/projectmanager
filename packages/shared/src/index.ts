@@ -233,8 +233,14 @@ export interface FlagDTO {
   id: string;
   type: FlagType;
   userId: string;
+  /** who the flag is about (so an all-team view can tell people apart) */
+  userLogin: string | null;
   sessionId: string | null;
   taskId: string | null;
+  /** which task the flag is about, when applicable */
+  taskTitle: string | null;
+  taskOrigin: string | null;
+  repoFullName: string | null;
   detail: string;
   status: FlagStatus;
   createdAt: string;
@@ -246,6 +252,10 @@ export interface QuestionDTO {
   adminUserId: string;
   targetUserId: string;
   taskId: string;
+  /** task context so the recipient knows what the question is about */
+  taskTitle: string | null;
+  taskOrigin: string | null; // "#142", "PR #88", branch, or "task"
+  repoFullName: string | null;
   sessionId: string | null;
   body: string;
   blocksNext: boolean;

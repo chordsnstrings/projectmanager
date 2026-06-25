@@ -230,6 +230,8 @@ describe('authed API integration', () => {
     });
     expect(ok.statusCode).toBe(200);
     expect(ok.json().status).toBe('resolved');
+    // flag carries the person it's about, so an all-team view can tell people apart
+    expect(typeof ok.json().userLogin).toBe('string');
     await prisma.flag.delete({ where: { id: flag.id } });
   });
 
@@ -423,6 +425,13 @@ describe('authed API integration', () => {
     expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: devCookie } })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/users', headers: { cookie: adminCookie } })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/repos', headers: { cookie: collabCookie } })).statusCode).toBe(200);
+
+    // a raised question carries its task context (so the recipient knows what it's about)
+    const q = await app.inject({ method: 'POST', url: '/questions', headers: { cookie: adminCookie }, payload: { targetUserId: devId, taskId: task.id, body: 'status?' } });
+    expect(q.statusCode).toBe(201);
+    expect(q.json().taskTitle).toBe('Ship onboarding');
+    expect(q.json().taskOrigin).toBe('task');
+    await prisma.question.deleteMany({ where: { taskId: task.id } });
 
     // cleanup
     await prisma.session.deleteMany({ where: { taskId: task.id } });
