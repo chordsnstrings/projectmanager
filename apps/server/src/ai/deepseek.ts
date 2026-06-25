@@ -108,8 +108,12 @@ Be conservative: only mark ready:false when real, important information is missi
   }
   if (!res.ok) throw new AiError('ai_request_failed', res.status);
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const raw = data?.choices?.[0]?.message?.content?.trim();
-  if (!raw) throw new AiError('ai_empty_response');
+  const rawContent = data?.choices?.[0]?.message?.content?.trim();
+  if (!rawContent) throw new AiError('ai_empty_response');
+  // Be tolerant: some models wrap JSON in ```code fences``` or add stray text.
+  let raw = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const brace = raw.match(/\{[\s\S]*\}/);
+  if (brace) raw = brace[0];
   let parsed: Partial<Readiness>;
   try {
     parsed = JSON.parse(raw);

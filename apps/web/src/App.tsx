@@ -321,8 +321,11 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   }, [questions]);
 
   const onStart = useCallback(
-    async (taskId: string) => {
-      await api<SessionDTO>('/sessions', { method: 'POST', body: JSON.stringify({ taskId }) });
+    async (taskId: string, intent?: string) => {
+      await api<SessionDTO>('/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ taskId, intent: intent?.trim() ? intent.trim().slice(0, 300) : undefined }),
+      });
       await refresh();
     },
     [refresh],

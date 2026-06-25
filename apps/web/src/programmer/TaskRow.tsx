@@ -35,7 +35,7 @@ export interface TaskRowProps {
   /** required when state === 'wrapping' */
   draft?: DraftSummary;
   commits?: CommitDTO[];
-  onStart?: (taskId: string) => void;
+  onStart?: (taskId: string, intent?: string) => void;
   onStop?: (sessionId: string) => void;
   onOverrideActivity?: (sessionId: string, activity: ActivityType) => void;
   /** the current user's team activity keys (for the one-tap cycle) */
@@ -130,9 +130,18 @@ export default function TaskRow({
   const activity: ActivityType | null = session?.inferredActivity ?? null;
   const cycle = activityKeys && activityKeys.length > 0 ? activityKeys : DEFAULT_ACTIVITIES;
   const [showDetails, setShowDetails] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [intentText, setIntentText] = useState('');
   // Manual tasks (and anything with a brief/plan) carry a details panel:
   // description, the approved step-by-step, and a comment thread.
   const hasDetails = !!(task.description || task.plan) || task.source === 'manual';
+  const beginStart = () => {
+    const t = intentText.trim();
+    if (!t) return;
+    onStart(task.id, t);
+    setStarting(false);
+    setIntentText('');
+  };
 
   // The signature 3px left edge — only on a running row, colored by activity.
   const edgeStyle =
@@ -219,7 +228,7 @@ export default function TaskRow({
           {state === 'idle' && (
             <button
               type="button"
-              onClick={() => onStart(task.id)}
+              onClick={() => setStarting((v) => !v)}
               className="w-10 h-10 grid place-items-center rounded-full border border-white/[0.1] text-text2 pl-0.5 transition-all duration-150 ease-smooth hover:bg-brass hover:text-[#1a140a] hover:border-brass hover:shadow-glow-brass active:scale-90"
               title="start session"
               aria-label="start session"
@@ -235,6 +244,30 @@ export default function TaskRow({
           )}
         </div>
       </div>
+
+      {/* Start prompt — capture what they're about to work on (intent) */}
+      {starting && state === 'idle' && (
+        <div className="px-4 sm:px-5 pb-4 -mt-1 flex flex-col gap-1.5 animate-fade-in">
+          <span className="label">what are you working on?</span>
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={intentText}
+              maxLength={300}
+              onChange={(e) => setIntentText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') beginStart();
+                if (e.key === 'Escape') setStarting(false);
+              }}
+              placeholder="e.g. wiring the OAuth callback + a couple of tests"
+              className="field h-9 px-3 text-sm flex-1"
+            />
+            <button type="button" onClick={() => setStarting(false)} className="btn btn-sm btn-ghost">cancel</button>
+            <button type="button" onClick={beginStart} disabled={!intentText.trim()} className="btn btn-sm btn-primary">Start</button>
+          </div>
+          <span className="font-mono text-[10px] text-text3 self-end">{intentText.length}/300</span>
+        </div>
+      )}
 
       {showDetails && hasDetails && (
         <div className="px-4 sm:px-5 pb-4 -mt-1 flex flex-col gap-3 animate-fade-in">

@@ -40,7 +40,7 @@ export interface ProgrammerScreenProps {
   tasks: TaskDTO[];
   /** keyed by task id */
   sessionsByTask: Record<string, TaskSessionState>;
-  onStart?: (taskId: string) => void;
+  onStart?: (taskId: string, intent?: string) => void;
   onStop?: (sessionId: string) => void;
   onOverrideActivity?: (sessionId: string, activity: ActivityType) => void;
   onSaveSummary?: (
