@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { ManagedTask, MemberLite, RepoLite, TaskStatus } from '@cadence/shared';
-import { api } from '../lib/api';
+import type { ManagedTask, MemberLite, RepoLite, TaskReadiness, TaskStatus } from '@cadence/shared';
+import { api, ApiError } from '../lib/api';
 import { fmtDuration } from '../lib/format';
 import TaskDiscussion from '../components/TaskDiscussion';
 
@@ -187,6 +187,7 @@ function TaskRow({
   const [aiBusy, setAiBusy] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
   const [gitErr, setGitErr] = useState<string | null>(null);
+  const [gate, setGate] = useState<TaskReadiness | null>(null);
 
   const save = async () => {
     setBusy(true);
@@ -221,14 +222,36 @@ function TaskRow({
     setAiBusy(false);
   };
 
-  const savePlan = async (approved?: boolean) => {
+  const checkReadiness = async () => {
+    if (aiBusy) return;
     setAiBusy(true);
-    await api(`/tasks/${task.id}/plan`, {
-      method: 'PATCH',
-      body: JSON.stringify({ plan: plan.trim() || null, ...(approved !== undefined ? { approved } : {}) }),
-    }).catch(() => {});
+    setAiErr(null);
+    await api(`/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify({ description: description.trim() || null }) }).catch(() => {});
+    await api(`/tasks/${task.id}/readiness`, { method: 'POST', body: '{}' }).catch(() => setAiErr('Readiness check needs DeepSeek configured.'));
     setAiBusy(false);
     onChanged();
+  };
+
+  const savePlan = async (approved?: boolean, override?: boolean) => {
+    setAiBusy(true);
+    try {
+      await api(`/tasks/${task.id}/plan`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          plan: plan.trim() || null,
+          ...(approved !== undefined ? { approved } : {}),
+          ...(override ? { override: true } : {}),
+        }),
+      });
+      setGate(null);
+      onChanged();
+    } catch (e) {
+      const body = e instanceof ApiError ? (e.body as { error?: string; readiness?: TaskReadiness } | undefined) : undefined;
+      if (e instanceof ApiError && e.status === 409 && body?.error === 'not_specified' && body.readiness) {
+        setGate(body.readiness);
+      }
+    }
+    setAiBusy(false);
   };
 
   const createBranch = async () => {
@@ -286,11 +309,43 @@ function TaskRow({
           <div className="rounded-lg border border-hair bg-surface/40 p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
               <span className="label">step-by-step plan {task.planApproved && <span className="text-success">· approved</span>}</span>
-              <button type="button" onClick={generatePlan} disabled={aiBusy} className="font-mono text-[11px] text-brass hover:text-brass/80 disabled:opacity-50">
-                {aiBusy ? 'thinking…' : plan ? '↻ regenerate' : '✨ generate steps'}
-              </button>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={checkReadiness} disabled={aiBusy} className="font-mono text-[11px] text-text3 hover:text-text2 disabled:opacity-50">
+                  check readiness
+                </button>
+                <button type="button" onClick={generatePlan} disabled={aiBusy} className="font-mono text-[11px] text-brass hover:text-brass/80 disabled:opacity-50">
+                  {aiBusy ? 'thinking…' : plan ? '↻ regenerate' : '✨ generate steps'}
+                </button>
+              </div>
             </div>
             {aiErr && <span className="font-mono text-[11px] text-danger">{aiErr}</span>}
+
+            {/* AI readiness verdict on the description */}
+            {task.readiness && (
+              <div className={`rounded-md border px-2.5 py-2 text-[11px] ${task.readiness.ready ? 'border-success/30 bg-success/[0.06]' : 'border-brass/30 bg-brass/[0.06]'}`}>
+                <div className="font-mono">
+                  {task.readiness.ready ? (
+                    <span className="text-success">✓ specified · {task.readiness.score}/100</span>
+                  ) : (
+                    <span className="text-brass">needs detail · {task.readiness.score}/100</span>
+                  )}
+                </div>
+                {!task.readiness.ready && task.readiness.missing.length > 0 && (
+                  <ul className="mt-1 flex flex-col gap-0.5 text-text2">
+                    {task.readiness.missing.map((m, i) => (
+                      <li key={i}>· {m}</li>
+                    ))}
+                  </ul>
+                )}
+                {!task.readiness.ready && task.readiness.questions.length > 0 && (
+                  <ul className="mt-1 flex flex-col gap-0.5 text-text3">
+                    {task.readiness.questions.map((q, i) => (
+                      <li key={i}>? {q}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {plan ? (
               <>
                 <textarea
@@ -299,6 +354,18 @@ function TaskRow({
                   rows={Math.min(16, Math.max(5, plan.split('\n').length + 1))}
                   className="field px-3 py-2 text-[13px] font-mono resize-y leading-relaxed"
                 />
+                {gate && (
+                  <div className="rounded-md border border-danger/40 bg-danger/[0.07] px-2.5 py-2 text-[11px] flex flex-col gap-1.5">
+                    <span className="text-danger font-mono">This task isn't specified enough to hand off ({gate.score}/100).</span>
+                    {gate.missing.length > 0 && (
+                      <ul className="text-text2 flex flex-col gap-0.5">{gate.missing.map((m, i) => <li key={i}>· {m}</li>)}</ul>
+                    )}
+                    <div className="flex items-center gap-2 justify-end mt-1">
+                      <button type="button" onClick={() => setGate(null)} className="btn btn-sm btn-ghost">I'll fix it</button>
+                      <button type="button" onClick={() => savePlan(true, true)} disabled={aiBusy} className="btn btn-sm border-danger/40 text-danger hover:bg-danger/10">Approve anyway</button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 justify-end">
                   <button type="button" onClick={() => savePlan()} disabled={aiBusy} className="btn btn-sm btn-ghost">Save plan</button>
                   {task.planApproved ? (

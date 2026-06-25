@@ -221,7 +221,21 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   const onClaim = useCallback(
     async (taskId: string) => {
-      await api(`/tasks/${taskId}/claim`, { method: 'POST', body: '{}' }).catch(() => {});
+      try {
+        await api(`/tasks/${taskId}/claim`, { method: 'POST', body: '{}' });
+      } catch (e) {
+        const body = e instanceof ApiError ? (e.body as { error?: string; readiness?: { score: number; missing: string[] } } | undefined) : undefined;
+        if (e instanceof ApiError && e.status === 409 && body?.error === 'not_specified') {
+          const r = body.readiness;
+          const ok = window.confirm(
+            `This task looks under-specified (${r?.score ?? 0}/100).\n` +
+              (r?.missing?.length ? `Missing: ${r.missing.join('; ')}\n\n` : '\n') +
+              'Pick it up anyway?',
+          );
+          if (ok) await api(`/tasks/${taskId}/claim`, { method: 'POST', body: JSON.stringify({ override: true }) }).catch(() => {});
+        }
+        // already_claimed or other → fall through to refresh
+      }
       await refresh();
     },
     [refresh],

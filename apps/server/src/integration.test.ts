@@ -463,7 +463,7 @@ describe('authed API integration', () => {
     const ck = (id: string) => `cad_session=${app.signCookie(id)}`;
 
     // a1 creates an unassigned pool task for their team
-    const created = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: ck(a1.id) }, payload: { title: 'Write launch copy' } });
+    const created = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: ck(a1.id) }, payload: { title: 'Write launch copy', description: 'Draft 3 short launch tweets for the new release, on-brand.' } });
     expect(created.statusCode).toBe(200);
     const taskId = created.json().id;
     expect(created.json().assignee).toBeNull();
@@ -566,6 +566,46 @@ describe('authed API integration', () => {
     await prisma.taskComment.deleteMany({ where: { taskId: id } });
     await prisma.task.delete({ where: { id } });
     await prisma.user.delete({ where: { id: outsider.id } });
+  });
+
+  it('readiness soft-gate blocks handoff/claim until specified or overridden', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
+
+    // handoff gate: a task with no description is "not specified" → 409, override passes
+    const t1 = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: adminCookie }, payload: { title: 'Vague', assigneeUserId: devId } });
+    const id1 = t1.json().id;
+    await app.inject({ method: 'PATCH', url: `/tasks/${id1}/plan`, headers: { cookie: adminCookie }, payload: { plan: '1. do' } });
+    const blocked = await app.inject({ method: 'PATCH', url: `/tasks/${id1}/plan`, headers: { cookie: adminCookie }, payload: { approved: true } });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error).toBe('not_specified');
+    const ovr = await app.inject({ method: 'PATCH', url: `/tasks/${id1}/plan`, headers: { cookie: adminCookie }, payload: { approved: true, override: true } });
+    expect(ovr.statusCode).toBe(200);
+    expect(ovr.json().planApproved).toBe(true);
+
+    // claim gate: unassigned, no description → 409, override claims it
+    const t2 = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: adminCookie }, payload: { title: 'Pool vague' } });
+    const id2 = t2.json().id;
+    expect((await app.inject({ method: 'POST', url: `/tasks/${id2}/claim`, headers: { cookie: devCookie }, payload: {} })).statusCode).toBe(409);
+    expect((await app.inject({ method: 'POST', url: `/tasks/${id2}/claim`, headers: { cookie: devCookie }, payload: { override: true } })).statusCode).toBe(200);
+
+    // a task with a cached "ready" verdict is NOT gated
+    const { createHash } = await import('node:crypto');
+    const desc = 'Build X. Scope: only the API. Done when tests pass. Deadline Friday.';
+    const t3 = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: adminCookie }, payload: { title: 'Clear', description: desc, assigneeUserId: devId } });
+    const id3 = t3.json().id;
+    const hash = createHash('sha1').update(desc.trim()).digest('hex').slice(0, 16);
+    await prisma.task.update({ where: { id: id3 }, data: { specReady: true, specScore: 90, specMissing: '[]', specQuestions: '[]', specDescHash: hash, specCheckedAt: new Date() } });
+    await app.inject({ method: 'PATCH', url: `/tasks/${id3}/plan`, headers: { cookie: adminCookie }, payload: { plan: '1. go' } });
+    const okReady = await app.inject({ method: 'PATCH', url: `/tasks/${id3}/plan`, headers: { cookie: adminCookie }, payload: { approved: true } });
+    expect(okReady.statusCode).toBe(200);
+    expect(okReady.json().planApproved).toBe(true);
+    expect(okReady.json().readiness?.ready).toBe(true);
+
+    await prisma.task.deleteMany({ where: { id: { in: [id1, id2, id3] } } });
   });
 
   it('team scoping: leads see only their team; owner sees all + ?team filter', async () => {

@@ -128,8 +128,17 @@ export interface TaskDTO {
   plan: string | null;
   /** the giver approved the plan for the assignee */
   planApproved: boolean;
+  /** AI "is this specified enough?" verdict (null = not yet checked) */
+  readiness: TaskReadiness | null;
   /** origin label for the row, e.g. "#142", "PR #88", "feat/foo", "task" */
   origin: string;
+}
+
+export interface TaskReadiness {
+  ready: boolean;
+  score: number; // 0..100
+  missing: string[];
+  questions: string[];
 }
 
 export interface TaskCommentDTO {

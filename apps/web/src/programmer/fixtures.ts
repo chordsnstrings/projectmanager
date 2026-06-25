@@ -27,6 +27,7 @@ const tasks: TaskDTO[] = [
     description: null,
     plan: null,
     planApproved: false,
+    readiness: null,
     origin: '#142',
   },
   {
@@ -44,6 +45,7 @@ const tasks: TaskDTO[] = [
     description: null,
     plan: null,
     planApproved: false,
+    readiness: null,
     origin: 'PR #88',
   },
   {
@@ -61,6 +63,7 @@ const tasks: TaskDTO[] = [
     description: null,
     plan: null,
     planApproved: false,
+    readiness: null,
     origin: 'feat/foo',
   },
   {
@@ -78,6 +81,7 @@ const tasks: TaskDTO[] = [
     description: null,
     plan: null,
     planApproved: false,
+    readiness: null,
     origin: '#201',
   },
 ];

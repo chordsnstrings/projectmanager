@@ -45,8 +45,27 @@ export function taskToDTO(
     description: t.description,
     plan: t.plan,
     planApproved: t.planApproved,
+    readiness:
+      t.specReady === null || t.specReady === undefined
+        ? null
+        : {
+            ready: t.specReady,
+            score: t.specScore ?? 0,
+            missing: safeArr(t.specMissing),
+            questions: safeArr(t.specQuestions),
+          },
     origin: taskOrigin(t),
   };
+}
+
+function safeArr(s: string | null | undefined): string[] {
+  if (!s) return [];
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Map a Task (+ assignee/members joined) to the admin ManagedTask DTO. */

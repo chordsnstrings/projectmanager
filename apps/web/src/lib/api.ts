@@ -3,6 +3,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    // parsed JSON error body, when the server sent one
+    public body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -16,7 +18,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
-    throw new ApiError(res.status, `${init?.method ?? 'GET'} ${path} → ${res.status}`);
+    const body = await res.json().catch(() => undefined);
+    throw new ApiError(res.status, `${init?.method ?? 'GET'} ${path} → ${res.status}`, body);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

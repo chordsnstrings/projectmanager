@@ -9,9 +9,79 @@ import { decryptToken } from '../auth/tokenCrypto';
 import { syncUserProjects } from '../github/userSync';
 import { autoStopOnCommit } from '../engine/reconcileFlags';
 import { createBranch, CreateBranchError, slugBranch } from '../github/createBranch';
-import { aiConfigured, AiError, generateTaskPlan } from '../ai/deepseek';
+import { aiConfigured, AiError, assessTaskReadiness, generateTaskPlan, type Readiness } from '../ai/deepseek';
+import { createHash } from 'node:crypto';
 
 const PAGE = 50;
+
+function descHash(s: string | null | undefined): string {
+  return createHash('sha1').update((s ?? '').trim()).digest('hex').slice(0, 16);
+}
+function parseArr(s: string | null): string[] {
+  if (!s) return [];
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+type ReadinessRow = {
+  id: string;
+  title: string;
+  displayTitle: string | null;
+  description: string | null;
+  teamId: string | null;
+  specReady: boolean | null;
+  specScore: number | null;
+  specMissing: string | null;
+  specQuestions: string | null;
+  specDescHash: string | null;
+};
+
+async function storeReadiness(taskId: string, v: Readiness, hash: string): Promise<void> {
+  await prisma.task
+    .update({
+      where: { id: taskId },
+      data: {
+        specReady: v.ready,
+        specScore: v.score,
+        specMissing: JSON.stringify(v.missing),
+        specQuestions: JSON.stringify(v.questions),
+        specCheckedAt: new Date(),
+        specDescHash: hash,
+      },
+    })
+    .catch(() => {});
+}
+
+/**
+ * Readiness verdict for a task, computing + caching when the cached verdict is
+ * stale (description changed) or missing. Returns null when it can't be assessed
+ * (no description-AI configured or the call failed) — callers then skip the gate.
+ */
+async function ensureReadiness(task: ReadinessRow, opts: { force?: boolean } = {}): Promise<Readiness | null> {
+  const desc = task.description?.trim() ?? '';
+  const hash = descHash(desc);
+  if (!desc) {
+    const v: Readiness = { ready: false, score: 0, missing: ['No description — add what needs doing.'], questions: [] };
+    await storeReadiness(task.id, v, hash);
+    return v;
+  }
+  if (!opts.force && task.specDescHash === hash && task.specReady !== null) {
+    return { ready: task.specReady, score: task.specScore ?? 0, missing: parseArr(task.specMissing), questions: parseArr(task.specQuestions) };
+  }
+  if (!aiConfigured()) return null;
+  try {
+    const team = task.teamId ? await prisma.team.findUnique({ where: { id: task.teamId }, select: { key: true } }) : null;
+    const v = await assessTaskReadiness({ title: task.displayTitle ?? task.title, description: desc, teamKey: team?.key ?? null });
+    await storeReadiness(task.id, v, hash);
+    return v;
+  } catch {
+    return null;
+  }
+}
 
 // Who can see / comment on a task: admin, lead of its team, the assignee, a
 // collaborator, or the creator.
@@ -137,7 +207,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Claim ("pick up") an unassigned team task.
-  app.post<{ Params: { id: string } }>('/tasks/:id/claim', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { override?: boolean } }>('/tasks/:id/claim', async (req, reply) => {
     const actor = await requireUser(req, reply);
     if (!actor) return;
     const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
@@ -145,6 +215,13 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     if (task.teamId !== actor.teamId) return reply.code(403).send({ error: 'not_your_team' });
     if (task.assigneeUserId === actor.id) return toManaged(await loadManaged(task.id)); // no-op
     if (task.assigneeUserId) return reply.code(409).send({ error: 'already_claimed' });
+    // Soft readiness gate: warn (don't hard-block) on an under-specified task.
+    if (!req.body?.override) {
+      const v = await ensureReadiness(task);
+      if (v && !v.ready) return reply.code(409).send({ error: 'not_specified', readiness: v });
+    } else {
+      req.log.info({ audit: 'task.spec.override', taskId: task.id, at: 'claim', by: actor.id }, 'audit');
+    }
     await prisma.task.update({ where: { id: task.id }, data: { assigneeUserId: actor.id } });
     req.log.info({ audit: 'task.claimed', taskId: task.id, by: actor.id }, 'audit');
     return toManaged(await loadManaged(task.id));
@@ -278,9 +355,22 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Check whether the description is specified enough (AI). Manager/creator;
+  // stores + returns the verdict. Used by the "check readiness" affordance.
+  app.post<{ Params: { id: string } }>('/tasks/:id/readiness', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    if (!aiConfigured()) return reply.code(503).send({ error: 'ai_not_configured' });
+    const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!task) return reply.code(404).send({ error: 'task_not_found' });
+    if (!canManagePlan(user, task)) return reply.code(403).send({ error: 'forbidden' });
+    await ensureReadiness(task, { force: true });
+    return toManaged(await loadManaged(task.id));
+  });
+
   // Edit and/or approve the plan (manager-of-team or creator). Approval is the
   // gate that tells the assignee the steps are final.
-  app.patch<{ Params: { id: string }; Body: { plan?: string | null; approved?: boolean } }>(
+  app.patch<{ Params: { id: string }; Body: { plan?: string | null; approved?: boolean; override?: boolean } }>(
     '/tasks/:id/plan',
     async (req, reply) => {
       const user = await requireUser(req, reply);
@@ -288,6 +378,15 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       const task = await prisma.task.findFirst({ where: { id: req.params.id, deletedAt: null } });
       if (!task) return reply.code(404).send({ error: 'task_not_found' });
       if (!canManagePlan(user, task)) return reply.code(403).send({ error: 'forbidden' });
+      // Soft readiness gate on approval (handoff): warn unless overridden.
+      if (req.body?.approved === true) {
+        if (!req.body?.override) {
+          const v = await ensureReadiness(task);
+          if (v && !v.ready) return reply.code(409).send({ error: 'not_specified', readiness: v });
+        } else {
+          req.log.info({ audit: 'task.spec.override', taskId: task.id, at: 'approve', by: user.id }, 'audit');
+        }
+      }
       const data: Record<string, unknown> = {};
       if (req.body?.plan !== undefined) {
         data.plan = req.body.plan && req.body.plan.trim() ? req.body.plan.slice(0, 8000) : null;

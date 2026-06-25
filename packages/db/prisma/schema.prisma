@@ -152,6 +152,13 @@ model Task {
   planApproved    Boolean   @default(false) // the giver approved the plan for the assignee
   planApprovedById String?
   planApprovedAt  DateTime?
+  // Cached AI "is this specified enough?" verdict (soft gate at handoff/claim).
+  specReady       Boolean?
+  specScore       Int?
+  specMissing     String? // JSON array of gaps
+  specQuestions   String? // JSON array of clarifying questions
+  specCheckedAt   DateTime?
+  specDescHash    String? // hash of the description the verdict was computed for
   milestoneTitle  String? // GitHub milestone (often a version, e.g. "v1.2") — completion grouping
   milestoneDueOn  DateTime?
   reopenCount     Int        @default(0)
