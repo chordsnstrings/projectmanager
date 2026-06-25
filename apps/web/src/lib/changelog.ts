@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4',
+    date: '2026-06-25',
+    title: 'Start your day with a check-in',
+    items: [
+      'Morning check-in: rate yesterday, set where each open task stands, name your biggest blocker, and pick today’s focus.',
+      'New admin Pulse tab — felt-vs-measured per member, sentiment trend, blocker breakdown, and live carry-over.',
+      'Picking up detected work now asks what you’re working on, just like the play button.',
+    ],
+  },
+  {
     version: '1.3',
     date: '2026-06-25',
     title: 'Teams, clarity & a shared task pool',

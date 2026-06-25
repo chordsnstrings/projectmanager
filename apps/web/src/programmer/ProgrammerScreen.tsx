@@ -47,7 +47,7 @@ export interface ProgrammerScreenProps {
     sessionId: string,
     payload: { summary: string; blocked: boolean; closesIssues: number[] },
   ) => void;
-  onStartNudge?: (nudge: NudgeDTO) => void;
+  onStartNudge?: (nudge: NudgeDTO, intent?: string) => void;
   onDismissNudge?: (nudge: NudgeDTO) => void;
   onStartOffTask?: () => void;
   onSignOut?: () => void;
@@ -84,6 +84,75 @@ function RunningTimer({ startedAt }: { startedAt: string }) {
 }
 
 const noop = () => {};
+
+/** Detected-work nudge — on Start, capture intent (what they're doing) like the play button. */
+function NudgeBanner({
+  nudge,
+  onStartNudge,
+  onDismissNudge,
+}: {
+  nudge: NudgeDTO;
+  onStartNudge: (nudge: NudgeDTO, intent?: string) => void;
+  onDismissNudge: (nudge: NudgeDTO) => void;
+}) {
+  const [starting, setStarting] = useState(false);
+  const [intent, setIntent] = useState('');
+  const begin = () => {
+    const t = intent.trim();
+    if (!t) return;
+    onStartNudge(nudge, t);
+    setStarting(false);
+    setIntent('');
+  };
+  return (
+    <div className="rounded-xl border border-brass/30 bg-brass/[0.06] px-4 py-3.5 flex flex-col gap-3 animate-fade-in">
+      <div className="flex items-center gap-3">
+        <span className="w-2 h-2 rounded-full bg-brass shrink-0 animate-pulse" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm text-text font-medium tracking-tightish">Detected work with no session</div>
+          <div className="font-mono text-xs text-text2 truncate mt-0.5">
+            {nudge.repoFullName}
+            {nudge.branch ? ` · ${nudge.branch}` : ''} — {nudge.detail}
+          </div>
+        </div>
+        {!starting && (
+          <button type="button" onClick={() => setStarting(true)} className="btn btn-sm btn-primary shrink-0">
+            Start
+          </button>
+        )}
+        <button type="button" onClick={() => onDismissNudge(nudge)} className="btn btn-sm btn-quiet shrink-0">
+          Dismiss
+        </button>
+      </div>
+      {starting && (
+        <div className="flex flex-col gap-1.5">
+          <span className="label">what are you working on?</span>
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={intent}
+              maxLength={300}
+              onChange={(e) => setIntent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') begin();
+                if (e.key === 'Escape') setStarting(false);
+              }}
+              placeholder="e.g. picking up the API error-handling branch"
+              className="field h-9 px-3 text-sm flex-1"
+            />
+            <button type="button" onClick={() => setStarting(false)} className="btn btn-sm btn-ghost">
+              cancel
+            </button>
+            <button type="button" onClick={begin} disabled={!intent.trim()} className="btn btn-sm btn-primary">
+              Start
+            </button>
+          </div>
+          <span className="font-mono text-[10px] text-text3 self-end">{intent.length}/300</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ProdStat({ label, value, tone = 'text-text' }: { label: string; value: string; tone?: string }) {
   return (
@@ -191,34 +260,7 @@ export default function ProgrammerScreen({
         <TaskPool pool={pool} onClaim={onClaim} onCreateTask={onCreateTask} />
 
         {/* Detected-branch nudge banner */}
-        {nudge && (
-          <div className="rounded-xl border border-brass/30 bg-brass/[0.06] px-4 py-3.5 flex items-center gap-3 animate-fade-in">
-            <span className="w-2 h-2 rounded-full bg-brass shrink-0 animate-pulse" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm text-text font-medium tracking-tightish">
-                Detected work with no session
-              </div>
-              <div className="font-mono text-xs text-text2 truncate mt-0.5">
-                {nudge.repoFullName}
-                {nudge.branch ? ` · ${nudge.branch}` : ''} — {nudge.detail}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onStartNudge(nudge)}
-              className="btn btn-sm btn-primary shrink-0"
-            >
-              Start
-            </button>
-            <button
-              type="button"
-              onClick={() => onDismissNudge(nudge)}
-              className="btn btn-sm btn-quiet shrink-0"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        {nudge && <NudgeBanner nudge={nudge} onStartNudge={onStartNudge} onDismissNudge={onDismissNudge} />}
 
         {/* Running off-task sessions — only place they can be stopped */}
         {offTaskRunning.length > 0 && (

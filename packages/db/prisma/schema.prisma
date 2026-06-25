@@ -92,6 +92,7 @@ model User {
   sessions    Session[]
   taskMemberships TaskMember[]
   taskComments TaskComment[]
+  dailyCheckins DailyCheckin[]
   flags       Flag[]
   questions   Question[]  @relation("QuestionTarget")
   createdAt   DateTime    @default(now())
@@ -174,6 +175,28 @@ model Task {
   @@unique([repoId, source, githubNumber, branch])
   @@index([assigneeUserId, status])
   @@index([teamId, source, assigneeUserId])
+}
+
+// Morning "start your day" check-in: yesterday reflection + today's plan.
+model DailyCheckin {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  localDate     String    // YYYY-MM-DD in the user's timezone (the day of the check-in)
+  skipped       Boolean   @default(false)
+  productivity  Int? // 1..5 self-rating of yesterday
+  blocker       String? // chip key: review | requirements | bug | meetings | none | other
+  blockerNote   String?
+  focus         String? // free-text focus for today
+  focusTaskIds  String? // JSON array of task ids
+  confidence    Int? // 1..5 confidence in today's plan
+  carryover     String? // JSON: [{ taskId, status: on_track|blocked|dropping }]
+  yesterdayActiveMinutes Int? // measured snapshot for felt-vs-measured
+  yesterdayCompleted     Int?
+  createdAt     DateTime  @default(now())
+
+  @@unique([userId, localDate])
+  @@index([userId, localDate])
 }
 
 // A discussion comment on a task (giver ↔ receiver back-and-forth).

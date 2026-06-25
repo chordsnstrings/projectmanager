@@ -46,6 +46,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!available) return;
   await prisma.question.deleteMany({ where: { targetUserId: devId } });
+  await prisma.dailyCheckin.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.session.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.user.deleteMany({ where: { id: { in: [adminId, devId] } } });
   await app.close();
@@ -653,5 +654,42 @@ describe('authed API integration', () => {
     expect(q.statusCode).toBe(403);
 
     await prisma.user.deleteMany({ where: { id: { in: [leadA.id, leadB.id, devA.id, devB.id] } } });
+  });
+
+  it('daily check-in: prompt → submit (once/day) → admin pulse aggregates', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
+
+    // Prompt is needed before any check-in today.
+    const p0 = await app.inject({ method: 'GET', url: '/me/checkin', headers: { cookie: devCookie } });
+    expect(p0.statusCode).toBe(200);
+    expect(p0.json().needed).toBe(true);
+
+    // Submit a check-in.
+    const sub = await app.inject({
+      method: 'POST',
+      url: '/me/checkin',
+      headers: { cookie: devCookie },
+      payload: { productivity: 4, blocker: 'review', blockerNote: 'waiting on PR', focus: 'finish auth', confidence: 3 },
+    });
+    expect(sub.statusCode).toBe(200);
+
+    // Now it's no longer needed (once per local day).
+    const p1 = await app.inject({ method: 'GET', url: '/me/checkin', headers: { cookie: devCookie } });
+    expect(p1.json().needed).toBe(false);
+
+    // Admin Pulse reflects the response; a member cannot reach it.
+    const pulse = await app.inject({ method: 'GET', url: '/dashboard/checkins', headers: { cookie: adminCookie } });
+    expect(pulse.statusCode).toBe(200);
+    const mine = pulse.json().members.find((m: { userId: string }) => m.userId === devId);
+    expect(mine?.responses).toBe(1);
+    expect(mine?.avgProductivity).toBe(4);
+    expect(pulse.json().blockers.some((b: { key: string; count: number }) => b.key === 'review' && b.count >= 1)).toBe(true);
+    expect((await app.inject({ method: 'GET', url: '/dashboard/checkins', headers: { cookie: devCookie } })).statusCode).toBe(403);
+
+    await prisma.dailyCheckin.deleteMany({ where: { userId: devId } });
   });
 });

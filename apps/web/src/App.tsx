@@ -19,6 +19,7 @@ import type {
   MemberLite as MemberLiteDTO,
   RepoLite as RepoLiteDTO,
   TeamDTO as TeamDTOAlias,
+  PulseInsights,
 } from '@cadence/shared';
 import { activityKeysFor } from './lib/activity';
 import { api, ApiError } from './lib/api';
@@ -29,6 +30,7 @@ import InstallButton from './components/InstallButton';
 import Onboarding from './Onboarding';
 import UpdateModal from './UpdateModal';
 import UpdateToast from './UpdateToast';
+import CheckinModal from './CheckinModal';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -42,6 +44,7 @@ import AskAboutTask from './admin/AskAboutTask';
 import SendDigestButton from './admin/SendDigestButton';
 import RunLoginCheckButton from './admin/RunLoginCheckButton';
 import QuestionsPanel from './admin/QuestionsPanel';
+import PulsePanel from './admin/PulsePanel';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
 
@@ -126,6 +129,7 @@ export default function App() {
   return (
     <>
       {screen}
+      <CheckinModal me={auth.me} />
       <UpdateModal me={auth.me} onAck={ackVersion} />
       <UpdateToast />
     </>
@@ -381,10 +385,16 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     [refresh],
   );
 
-  const onStartOffTask = useCallback(async () => {
-    await api<SessionDTO>('/sessions', { method: 'POST', body: JSON.stringify({ offTaskLabel: 'off-task' }) });
-    await refresh();
-  }, [refresh]);
+  const onStartOffTask = useCallback(
+    async (intent?: string) => {
+      await api<SessionDTO>('/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ offTaskLabel: 'off-task', intent: intent?.trim() ? intent.trim().slice(0, 300) : undefined }),
+      });
+      await refresh();
+    },
+    [refresh],
+  );
 
   // Start a labelled non-git activity now (meeting/research/…).
   const onStartLabeled = useCallback(
@@ -414,9 +424,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   }, [stopOnCommit]);
 
   const onStartNudge = useCallback(
-    async (n: NudgeDTO) => {
-      if (n.suggestedTaskId) await onStart(n.suggestedTaskId);
-      else await onStartOffTask();
+    async (n: NudgeDTO, intent?: string) => {
+      if (n.suggestedTaskId) await onStart(n.suggestedTaskId, intent);
+      else await onStartOffTask(intent);
     },
     [onStart, onStartOffTask],
   );
@@ -543,7 +553,7 @@ function shiftDate(d: string, delta: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-type AdminTab = 'team' | 'tasks' | 'flags' | 'questions';
+type AdminTab = 'team' | 'tasks' | 'flags' | 'questions' | 'pulse';
 
 function AdminApp({ me, route }: { me: Me; route: Route }) {
   const { path, params, navigate } = route;
@@ -560,7 +570,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       ? 'questions'
       : path.startsWith('/admin/tasks')
         ? 'tasks'
-        : 'team';
+        : path.startsWith('/admin/pulse')
+          ? 'pulse'
+          : 'team';
   const teamView: 'roster' | 'day' = path.startsWith('/admin/team/day') ? 'day' : 'roster';
   const date = params.get('date') ?? todayStr();
   const isToday = date === todayStr();
@@ -577,6 +589,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const [flags, setFlags] = useState<FlagDTO[]>([]);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [managedTasks, setManagedTasks] = useState<ManagedTaskDTO[] | null>(null);
+  const [pulse, setPulse] = useState<PulseInsights | null>(null);
   const [roster, setRoster] = useState<MemberLiteDTO[]>([]);
   const [repos, setRepos] = useState<RepoLiteDTO[]>([]);
   const [teamsList, setTeamsList] = useState<TeamDTOAlias[]>([]);
@@ -622,6 +635,14 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     [teamFilter],
   );
 
+  const loadPulse = useCallback(
+    () =>
+      api<PulseInsights>(`/dashboard/checkins${teamFilter ? `?team=${teamFilter}` : ''}`)
+        .then(setPulse)
+        .catch(() => setPulse(null)),
+    [teamFilter],
+  );
+
   const loadDay = useCallback(
     (userId: string) =>
       api<DayTimelineDTO>(`/dashboard/user/${userId}/day?date=${date}`).then(setDay).catch(() => setDay(null)),
@@ -664,12 +685,13 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   useEffect(() => {
     if (tab === 'flags') void loadFlags();
     if (tab === 'questions') void loadQuestions();
+    if (tab === 'pulse') void loadPulse();
     if (tab === 'tasks') {
       void loadManagedTasks();
       void api<MemberLiteDTO[]>(`/users${teamFilter ? `?team=${teamFilter}` : ''}`).then(setRoster).catch(() => {});
       if (repos.length === 0) void api<RepoLiteDTO[]>('/repos').then(setRepos).catch(() => {});
     }
-  }, [tab, loadFlags, loadQuestions, loadManagedTasks, teamFilter, repos.length]);
+  }, [tab, loadFlags, loadQuestions, loadPulse, loadManagedTasks, teamFilter, repos.length]);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -779,6 +801,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       <div className="px-4 sm:px-6 pt-5 max-w-6xl mx-auto w-full flex items-center gap-1.5 flex-wrap">
         {tabBtn('team', 'People')}
         {tabBtn('tasks', 'Tasks')}
+        {tabBtn('pulse', 'Pulse')}
         {tabBtn('flags', 'Flags')}
         {tabBtn('questions', 'Questions')}
         {isOwner && teamsList.length > 0 && (
@@ -803,6 +826,8 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onOpenUser={openUserDay} />
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
+        ) : tab === 'pulse' ? (
+          <PulsePanel data={pulse} />
         ) : tab === 'tasks' ? (
           <TasksPanel
             tasks={managedTasks}

@@ -13,6 +13,7 @@ import { taskRoutes } from './routes/tasks';
 import { sessionRoutes } from './routes/sessions';
 import { flagRoutes } from './routes/flags';
 import { questionRoutes } from './routes/questions';
+import { checkinRoutes } from './routes/checkin';
 import { dashboardRoutes } from './routes/dashboard';
 import { directoryRoutes } from './routes/directory';
 import { integrationRoutes } from './routes/integrations';
@@ -65,6 +66,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(sessionRoutes);
   await app.register(flagRoutes);
   await app.register(questionRoutes);
+  await app.register(checkinRoutes);
   await app.register(dashboardRoutes);
   await app.register(directoryRoutes);
   await app.register(integrationRoutes);

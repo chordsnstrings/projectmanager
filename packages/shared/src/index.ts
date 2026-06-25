@@ -352,6 +352,56 @@ export interface TeamDayMember {
   sessions: TeamDaySession[];
 }
 
+// ── Daily check-in (morning ritual) ─────────────────────────────────────────
+export type CarryoverStatus = 'on_track' | 'blocked' | 'dropping';
+export type BlockerKey = 'review' | 'requirements' | 'bug' | 'meetings' | 'none' | 'other';
+
+export interface CarryoverItem {
+  taskId: string;
+  status: CarryoverStatus;
+}
+
+/** What the check-in modal needs: measured recap + open tasks to reflect on. */
+export interface CheckinPrompt {
+  needed: boolean; // no check-in recorded for today yet
+  localDate: string; // YYYY-MM-DD
+  weekday: boolean;
+  yesterday: { activeMinutes: number; completed: number; inProgress: number; date: string };
+  openTasks: { id: string; title: string }[];
+}
+
+export interface CheckinSubmit {
+  productivity?: number | null; // 1..5
+  blocker?: BlockerKey | null;
+  blockerNote?: string | null;
+  focus?: string | null;
+  focusTaskIds?: string[];
+  confidence?: number | null; // 1..5
+  carryover?: CarryoverItem[];
+}
+
+// Admin "Pulse" insights from check-ins.
+export interface PulseMember {
+  userId: string;
+  githubLogin: string;
+  name: string | null;
+  avatarUrl: string | null;
+  responses: number;
+  avgProductivity: number | null; // 1..5
+  avgActiveMinutes: number; // measured, per checked-in day
+  /** felt-vs-measured: + = feels better than output, − = output beats how they feel */
+  gap: number | null;
+  lastBlocker: BlockerKey | null;
+  lastCheckinDate: string | null;
+}
+export interface PulseInsights {
+  rangeDays: number;
+  members: PulseMember[];
+  sentiment: { weekStart: string; avgProductivity: number | null; responses: number }[];
+  blockers: { key: BlockerKey; count: number }[];
+  carryover: { blocked: number; dropping: number; onTrack: number };
+}
+
 // ── Productivity / progress / completion / versions ─────────────────────────
 export interface ProductivityWindow {
   activeMinutes: number;
