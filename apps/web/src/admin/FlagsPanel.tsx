@@ -7,6 +7,7 @@ export interface FlagsPanelProps {
   onResolve: (id: string) => void;
   onDismiss: (id: string) => void;
   onAsk: (flag: FlagDTO, body: string) => void;
+  onOpenUser?: (userId: string, iso?: string | null) => void;
 }
 
 const TYPE_LABEL: Record<FlagDTO['type'], string> = {
@@ -43,11 +44,13 @@ function FlagRow({
   onResolve,
   onDismiss,
   onAsk,
+  onOpenUser,
 }: {
   flag: FlagDTO;
   onResolve: (id: string) => void;
   onDismiss: (id: string) => void;
   onAsk: (flag: FlagDTO, body: string) => void;
+  onOpenUser?: (userId: string, iso?: string | null) => void;
 }) {
   const [asking, setAsking] = useState(false);
   const [body, setBody] = useState('');
@@ -68,16 +71,28 @@ function FlagRow({
           <div className="flex flex-wrap items-center gap-2">
             <TypeBadge type={flag.type} />
             {flag.userLogin ? (
-              <span className="font-mono text-[11px] text-text2">@{flag.userLogin}</span>
+              <button
+                type="button"
+                onClick={() => onOpenUser?.(flag.userId, flag.createdAt)}
+                className="font-mono text-[11px] text-text2 hover:text-brass hover:underline"
+                title="open their day"
+              >
+                @{flag.userLogin}
+              </button>
             ) : null}
             <span className="font-mono text-[11px] text-text3">{relativeTime(flag.createdAt)}</span>
           </div>
           {flag.taskTitle ? (
-            <div className="font-mono text-[11px] text-text3 truncate">
+            <button
+              type="button"
+              onClick={() => onOpenUser?.(flag.userId, flag.createdAt)}
+              className="font-mono text-[11px] text-text3 truncate text-left hover:text-brass"
+              title="open their day"
+            >
               {flag.taskOrigin ? `${flag.taskOrigin} · ` : ''}
               <span className="text-text2">{flag.taskTitle}</span>
               {flag.repoFullName ? ` · ${flag.repoFullName}` : ''}
-            </div>
+            </button>
           ) : null}
           <p className="text-sm text-text2 leading-relaxed break-words">{flag.detail}</p>
         </div>
@@ -149,7 +164,7 @@ function FlagRow({
   );
 }
 
-export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk }: FlagsPanelProps) {
+export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onOpenUser }: FlagsPanelProps) {
   return (
     <section className="card overflow-hidden animate-fade-in">
       <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
@@ -173,6 +188,7 @@ export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk }: Flags
               onResolve={onResolve}
               onDismiss={onDismiss}
               onAsk={onAsk}
+              onOpenUser={onOpenUser}
             />
           ))}
         </ul>

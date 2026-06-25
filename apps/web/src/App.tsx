@@ -650,6 +650,18 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   }, [selectedUser, personView, date, loadDay, loadTrends, loadProgress]);
 
   const selectUser = useCallback((userId: string) => navigate(`/admin/u/${userId}/day`), [navigate]);
+  // Jump to a person's day timeline, on the day of the given item when provided.
+  const openUserDay = useCallback(
+    (userId: string, iso?: string | null) => {
+      let d = '';
+      if (iso) {
+        const ds = new Date(iso).toLocaleDateString('en-CA'); // YYYY-MM-DD, local
+        if (ds !== todayStr()) d = ds;
+      }
+      navigate(`/admin/u/${userId}/day${d ? `?date=${d}` : ''}`);
+    },
+    [navigate],
+  );
 
   const onResolve = useCallback(
     (id: string) => {
@@ -759,9 +771,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
       <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
         {tab === 'flags' ? (
-          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} />
+          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onOpenUser={openUserDay} />
         ) : tab === 'questions' ? (
-          <QuestionsPanel questions={questions} />
+          <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
         ) : tab === 'tasks' ? (
           <TasksPanel
             tasks={managedTasks}

@@ -30,6 +30,14 @@ async function loadTaskCtx(taskIds: string[]): Promise<Map<string, TaskCtx>> {
   return new Map(tasks.map((t) => [t.id, t]));
 }
 
+/** GitHub login per user id (for the "who must answer" chip). */
+async function loadLogins(userIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Map();
+  const users = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, githubLogin: true } });
+  return new Map(users.map((u) => [u.id, u.githubLogin]));
+}
+
 function toDTO(
   q: {
     id: string;
@@ -45,11 +53,13 @@ function toDTO(
     answeredAt: Date | null;
   },
   task?: TaskCtx | null,
+  targetLogin?: string | null,
 ): QuestionDTO {
   return {
     id: q.id,
     adminUserId: q.adminUserId,
     targetUserId: q.targetUserId,
+    targetLogin: targetLogin ?? null,
     taskId: q.taskId,
     taskTitle: task ? taskDisplayTitle(task) : null,
     taskOrigin: task ? taskOrigin(task) : null,
@@ -89,7 +99,9 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       { audit: 'question.raised', questionId: q.id, by: mgr.id, target: targetUserId, taskId, blocksNext: q.blocksNext },
       'audit',
     );
-    return reply.code(201).send(toDTO(q, (await loadTaskCtx([q.taskId])).get(q.taskId)));
+    return reply.code(201).send(
+      toDTO(q, (await loadTaskCtx([q.taskId])).get(q.taskId), (await loadLogins([q.targetUserId])).get(q.targetUserId)),
+    );
   });
 
   // Dev answers their question.
@@ -108,7 +120,11 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
         data: { answer, status: 'answered', answeredAt: new Date() },
       });
       req.log.info({ audit: 'question.answered', questionId: q.id, by: user.id }, 'audit');
-      return toDTO(updated, (await loadTaskCtx([updated.taskId])).get(updated.taskId));
+      return toDTO(
+        updated,
+        (await loadTaskCtx([updated.taskId])).get(updated.taskId),
+        (await loadLogins([updated.targetUserId])).get(updated.targetUserId),
+      );
     },
   );
 
@@ -131,7 +147,10 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    const ctx = await loadTaskCtx(rows.map((r) => r.taskId));
-    return rows.map((q) => toDTO(q, ctx.get(q.taskId)));
+    const [ctx, logins] = await Promise.all([
+      loadTaskCtx(rows.map((r) => r.taskId)),
+      loadLogins(rows.map((r) => r.targetUserId)),
+    ]);
+    return rows.map((q) => toDTO(q, ctx.get(q.taskId), logins.get(q.targetUserId)));
   });
 }

@@ -431,6 +431,7 @@ describe('authed API integration', () => {
     expect(q.statusCode).toBe(201);
     expect(q.json().taskTitle).toBe('Ship onboarding');
     expect(q.json().taskOrigin).toBe('task');
+    expect(typeof q.json().targetLogin).toBe('string');
     await prisma.question.deleteMany({ where: { taskId: task.id } });
 
     // cleanup

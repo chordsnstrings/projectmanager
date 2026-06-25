@@ -251,6 +251,8 @@ export interface QuestionDTO {
   id: string;
   adminUserId: string;
   targetUserId: string;
+  /** who must answer (so an admin all-team queue can tell people apart) */
+  targetLogin: string | null;
   taskId: string;
   /** task context so the recipient knows what the question is about */
   taskTitle: string | null;

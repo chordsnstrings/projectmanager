@@ -365,6 +365,7 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
         id: q.id,
         adminUserId: q.adminUserId,
         targetUserId: q.targetUserId,
+        targetLogin: user.githubLogin,
         taskId: q.taskId,
         taskTitle: t ? taskDisplayTitle(t) : null,
         taskOrigin: t ? taskOrigin(t) : null,

@@ -22,23 +22,38 @@ function BlocksChip() {
   );
 }
 
-function QuestionRow({ q }: { q: QuestionDTO }) {
+function QuestionRow({ q, onOpenUser }: { q: QuestionDTO; onOpenUser?: (userId: string, iso?: string | null) => void }) {
   return (
     <li className="border-b border-hair last:border-b-0 px-4 sm:px-5 py-3.5 flex flex-col gap-2 hover:bg-surface/25 transition-colors">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={q.status} />
         {q.blocksNext ? <BlocksChip /> : null}
+        {q.targetLogin ? (
+          <button
+            type="button"
+            onClick={() => onOpenUser?.(q.targetUserId, q.createdAt)}
+            className="font-mono text-[11px] text-text2 hover:text-brass hover:underline"
+            title="open their day"
+          >
+            @{q.targetLogin}
+          </button>
+        ) : null}
         <span className="font-mono text-[11px] text-text3 ml-auto" title={fmtClock(q.createdAt)}>
           {relativeTime(q.createdAt)}
         </span>
       </div>
 
       {q.taskTitle ? (
-        <div className="font-mono text-[11px] text-text3 truncate">
+        <button
+          type="button"
+          onClick={() => onOpenUser?.(q.targetUserId, q.createdAt)}
+          className="font-mono text-[11px] text-text3 truncate text-left hover:text-brass"
+          title="open their day"
+        >
           re: {q.taskOrigin ? `${q.taskOrigin} · ` : ''}
           <span className="text-text2">{q.taskTitle}</span>
           {q.repoFullName ? ` · ${q.repoFullName}` : ''}
-        </div>
+        </button>
       ) : null}
 
       <p className="text-sm text-text leading-relaxed break-words">{q.body}</p>
@@ -57,7 +72,13 @@ function QuestionRow({ q }: { q: QuestionDTO }) {
   );
 }
 
-export default function QuestionsPanel({ questions }: { questions: QuestionDTO[] }) {
+export default function QuestionsPanel({
+  questions,
+  onOpenUser,
+}: {
+  questions: QuestionDTO[];
+  onOpenUser?: (userId: string, iso?: string | null) => void;
+}) {
   const sorted = [...questions].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
@@ -74,7 +95,7 @@ export default function QuestionsPanel({ questions }: { questions: QuestionDTO[]
       ) : (
         <ul>
           {sorted.map((q) => (
-            <QuestionRow key={q.id} q={q} />
+            <QuestionRow key={q.id} q={q} onOpenUser={onOpenUser} />
           ))}
         </ul>
       )}
