@@ -352,6 +352,13 @@ describe('authed API integration', () => {
     const again = await app.inject({ method: 'PATCH', url: '/me/team', headers: { cookie }, payload: { teamKey: 'programming' } });
     expect(again.statusCode).toBe(409);
 
+    // what's-new: acknowledging a version persists on the user
+    expect(me0.json().lastSeenVersion).toBeNull();
+    const seen = await app.inject({ method: 'POST', url: '/me/seen', headers: { cookie }, payload: { version: '1.3' } });
+    expect(seen.statusCode).toBe(200);
+    const me1 = await app.inject({ method: 'GET', url: '/me', headers: { cookie } });
+    expect(me1.json().lastSeenVersion).toBe('1.3');
+
     await prisma.user.delete({ where: { id: fresh.id } });
   });
 

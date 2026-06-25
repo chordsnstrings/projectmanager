@@ -27,6 +27,7 @@ import { downloadTeamCsv } from './lib/csv';
 import { Logo } from './components/Logo';
 import InstallButton from './components/InstallButton';
 import Onboarding from './Onboarding';
+import UpdateModal from './UpdateModal';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -112,11 +113,20 @@ export default function App() {
   if (!auth.me.onboardingComplete) {
     return <Onboarding onDone={(me) => setAuth({ kind: 'authed', me })} />;
   }
+  // One-time "what's new" modal, acknowledged per user.
+  const ackVersion = (version: string) => {
+    if (auth.kind !== 'authed') return;
+    setAuth({ kind: 'authed', me: { ...auth.me, lastSeenVersion: version } });
+    void api('/me/seen', { method: 'POST', body: JSON.stringify({ version }) }).catch(() => {});
+  };
   // Owners and leads use the admin app (team-scoped server-side); devs the board.
-  return auth.me.role === 'dev' ? (
-    <DevApp me={auth.me} route={route} />
-  ) : (
-    <AdminApp me={auth.me} route={route} />
+  const screen =
+    auth.me.role === 'dev' ? <DevApp me={auth.me} route={route} /> : <AdminApp me={auth.me} route={route} />;
+  return (
+    <>
+      {screen}
+      <UpdateModal me={auth.me} onAck={ackVersion} />
+    </>
   );
 }
 

@@ -87,6 +87,7 @@ model User {
   githubAccessToken String? // OAuth token, AES-256-GCM encrypted at rest (per-user sync)
   teamId      String?     // null only until onboarding picks a team
   team        Team?       @relation(fields: [teamId], references: [id])
+  lastSeenVersion String?  // most recent changelog version this user has acknowledged
   emails      UserEmail[]
   sessions    Session[]
   taskMemberships TaskMember[]

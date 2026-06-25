@@ -26,6 +26,7 @@ type UserWithTeam = {
   timezone: string | null;
   teamId: string | null;
   team: { key: string } | null;
+  lastSeenVersion: string | null;
 };
 
 function toMe(user: UserWithTeam): Me {
@@ -41,6 +42,7 @@ function toMe(user: UserWithTeam): Me {
     teamId: user.teamId,
     teamKey: user.team?.key ?? null,
     onboardingComplete: user.teamId != null,
+    lastSeenVersion: user.lastSeenVersion,
   };
 }
 
@@ -164,6 +166,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
     const user = await prisma.user.update({ where: { id: userId }, data });
     return { stopOnCommit: user.stopOnCommit, timezone: user.timezone };
+  });
+
+  // Acknowledge the "what's new" modal for a changelog version (one-time per user).
+  app.post<{ Body: { version?: string } }>('/me/seen', async (req, reply) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
+    const version = req.body?.version?.trim();
+    if (!version) return reply.code(400).send({ error: 'version_required' });
+    await prisma.user.update({ where: { id: userId }, data: { lastSeenVersion: version.slice(0, 40) } });
+    return { ok: true };
   });
 
   // Onboarding: pick a team. One team per user — once set, only an admin can

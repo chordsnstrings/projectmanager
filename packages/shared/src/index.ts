@@ -90,6 +90,7 @@ export interface Me {
   teamId: string | null;
   teamKey: string | null; // registry key for the activity set (null until onboarded)
   onboardingComplete: boolean; // = teamId != null
+  lastSeenVersion: string | null; // most recent changelog version acknowledged
 }
 
 /** A team for the onboarding picker / admin switcher. */
