@@ -533,12 +533,19 @@ describe('authed API integration', () => {
     const { seedTeams } = await import('./scripts/seed-teams');
     await seedTeams(prisma);
     const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    const mkt = await prisma.team.findUniqueOrThrow({ where: { key: 'marketing' } });
     await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
-    const outsider = await prisma.user.create({
-      data: { githubId: BigInt(uniq()), githubLogin: `o_${uniq()}`, role: 'dev', teamId: prog.id },
+    // A teammate not attached to the task, and a genuinely cross-team user.
+    const teammate = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `tm_${uniq()}`, role: 'dev', teamId: prog.id },
+    });
+    const stranger = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: `x_${uniq()}`, role: 'dev', teamId: mkt.id },
     });
     // @ts-expect-error signCookie decorated by @fastify/cookie
-    const oc = `cad_session=${app.signCookie(outsider.id)}`;
+    const tc = `cad_session=${app.signCookie(teammate.id)}`;
+    // @ts-expect-error signCookie decorated by @fastify/cookie
+    const xc = `cad_session=${app.signCookie(stranger.id)}`;
 
     // create with a brief, assigned to dev
     const created = await app.inject({ method: 'POST', url: '/tasks', headers: { cookie: adminCookie }, payload: { title: 'Write copy', description: 'Need landing hero copy', assigneeUserId: devId } });
@@ -546,12 +553,17 @@ describe('authed API integration', () => {
     const id = created.json().id;
     expect(created.json().description).toBe('Need landing hero copy');
 
-    // assignee comments; both giver + receiver can read; an outsider can't
+    // assignee comments; giver + receiver + any teammate can read (team clarity);
+    // a teammate can join the discussion; only a cross-team user is shut out.
     expect((await app.inject({ method: 'POST', url: `/tasks/${id}/comments`, headers: { cookie: devCookie }, payload: { body: 'On it' } })).statusCode).toBe(201);
     const list = await app.inject({ method: 'GET', url: `/tasks/${id}/comments`, headers: { cookie: adminCookie } });
     expect(list.json().length).toBe(1);
     expect(list.json()[0].body).toBe('On it');
-    expect((await app.inject({ method: 'GET', url: `/tasks/${id}/comments`, headers: { cookie: oc } })).statusCode).toBe(403);
+    const teammateRead = await app.inject({ method: 'GET', url: `/tasks/${id}/comments`, headers: { cookie: tc } });
+    expect(teammateRead.statusCode).toBe(200);
+    expect(teammateRead.json().length).toBe(1);
+    expect((await app.inject({ method: 'POST', url: `/tasks/${id}/comments`, headers: { cookie: tc }, payload: { body: 'I can help' } })).statusCode).toBe(201);
+    expect((await app.inject({ method: 'GET', url: `/tasks/${id}/comments`, headers: { cookie: xc } })).statusCode).toBe(403);
 
     // plan generation is gated on DeepSeek being configured (it isn't in tests)
     expect((await app.inject({ method: 'POST', url: `/tasks/${id}/plan`, headers: { cookie: adminCookie }, payload: {} })).statusCode).toBe(503);
@@ -566,7 +578,7 @@ describe('authed API integration', () => {
 
     await prisma.taskComment.deleteMany({ where: { taskId: id } });
     await prisma.task.delete({ where: { id } });
-    await prisma.user.delete({ where: { id: outsider.id } });
+    await prisma.user.deleteMany({ where: { id: { in: [teammate.id, stranger.id] } } });
   });
 
   it('readiness soft-gate blocks handoff/claim until specified or overridden', async () => {

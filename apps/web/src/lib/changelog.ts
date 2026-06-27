@@ -17,6 +17,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Morning check-in: rate yesterday, set where each open task stands, name your biggest blocker, and pick today’s focus.',
       'New admin Pulse tab — felt-vs-measured per member, sentiment trend, blocker breakdown, and live carry-over.',
       'Picking up detected work now asks what you’re working on, just like the play button.',
+      'Task discussions are now visible to your whole team — read the brief + previous comments on a pool task before you pick it up.',
     ],
   },
   {

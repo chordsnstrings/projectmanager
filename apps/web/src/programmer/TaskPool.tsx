@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { TaskDTO } from '@cadence/shared';
+import TaskDiscussion from '../components/TaskDiscussion';
 
 /** Team task pool: claim an open task or add your own (self-serve). */
 export default function TaskPool({
@@ -72,17 +73,49 @@ export default function TaskPool({
 
       <ul>
         {pool.map((t) => (
-          <li key={t.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-hair last:border-b-0">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm text-text truncate tracking-tightish">{t.title}</div>
-              <div className="font-mono text-[10px] text-text3">unassigned</div>
-            </div>
-            <button onClick={() => onClaim(t.id)} className="btn btn-sm btn-ghost shrink-0">
-              pick up
-            </button>
-          </li>
+          <PoolRow key={t.id} task={t} onClaim={onClaim} />
         ))}
       </ul>
     </section>
+  );
+}
+
+/** A claimable pool task. Expands to show the brief + discussion so anyone can
+ *  read the prior conversation before picking it up. */
+function PoolRow({ task, onClaim }: { task: TaskDTO; onClaim: (taskId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const hasDetails = !!task.description || task.source === 'manual';
+  return (
+    <li className="border-b border-hair last:border-b-0">
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <button
+          onClick={() => hasDetails && setOpen((v) => !v)}
+          className="min-w-0 flex-1 text-left"
+          aria-expanded={open}
+        >
+          <div className="text-sm text-text truncate tracking-tightish">
+            {hasDetails && <span className="text-text3 font-mono text-[10px] mr-1.5">{open ? '▾' : '▸'}</span>}
+            {task.title}
+          </div>
+          <div className="font-mono text-[10px] text-text3">unassigned</div>
+        </button>
+        <button onClick={() => onClaim(task.id)} className="btn btn-sm btn-ghost shrink-0">
+          pick up
+        </button>
+      </div>
+      {open && hasDetails && (
+        <div className="px-4 pb-3.5 -mt-0.5 flex flex-col gap-3 animate-fade-in">
+          {task.description ? (
+            <div className="flex flex-col gap-1">
+              <span className="label">brief</span>
+              <p className="text-[13px] text-text2 whitespace-pre-wrap break-words">{task.description}</p>
+            </div>
+          ) : null}
+          <div className="border-t border-hair pt-3">
+            <TaskDiscussion taskId={task.id} />
+          </div>
+        </div>
+      )}
+    </li>
   );
 }

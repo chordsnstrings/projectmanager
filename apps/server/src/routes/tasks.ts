@@ -83,14 +83,18 @@ async function ensureReadiness(task: ReadinessRow, opts: { force?: boolean } = {
   }
 }
 
-// Who can see / comment on a task: admin, lead of its team, the assignee, a
-// collaborator, or the creator.
+// Who can see / comment on a task. Cadence is a team-clarity tool: a task's
+// discussion is visible to (and joinable by) anyone on the task's team — not
+// just the assignee/collaborators — so prior comments are seen by all. Admins
+// (owners) see every team. `task.teamId` is set for manual tasks (where briefs
+// + comments live); the assignee/collaborator/creator rules still cover the
+// occasional git task whose team isn't materialised on the row.
 function canAccessTask(
   user: AuthUser,
   task: { teamId: string | null; assigneeUserId: string | null; createdByUserId: string | null; members: { userId: string }[] },
 ): boolean {
   if (user.role === 'admin') return true;
-  if (user.role === 'lead' && task.teamId && task.teamId === user.teamId) return true;
+  if (task.teamId && task.teamId === user.teamId) return true; // any teammate (incl. lead)
   if (task.assigneeUserId === user.id || task.createdByUserId === user.id) return true;
   return task.members.some((m) => m.userId === user.id);
 }
