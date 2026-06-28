@@ -27,6 +27,7 @@ import { relativeTime } from './lib/format';
 import { downloadTeamCsv } from './lib/csv';
 import { Logo } from './components/Logo';
 import InstallButton from './components/InstallButton';
+import NotificationToggle from './components/NotificationToggle';
 import Onboarding from './Onboarding';
 import UpdateModal from './UpdateModal';
 import UpdateToast from './UpdateToast';
@@ -791,6 +792,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           </span>
         </div>
         <div className="flex items-center gap-1.5">
+          <NotificationToggle />
           <InstallButton />
           <button onClick={signOut} className="btn btn-sm btn-ghost">
             sign out

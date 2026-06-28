@@ -10,6 +10,7 @@ import { syncUserProjects } from '../github/userSync';
 import { autoStopOnCommit } from '../engine/reconcileFlags';
 import { createBranch, CreateBranchError, slugBranch } from '../github/createBranch';
 import { aiConfigured, AiError, assessTaskReadiness, generateTaskPlan, type Readiness } from '../ai/deepseek';
+import { pushToUser, pushToUsers } from '../services/push';
 import { createHash } from 'node:crypto';
 
 const PAGE = 50;
@@ -192,6 +193,19 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       include: managedInclude,
     });
     req.log.info({ audit: 'task.created', taskId: created.id, by: actor.id, team: actor.teamId }, 'audit');
+    // Notify the assignee (if it's someone else) and any collaborators.
+    if (assigneeUserId && assigneeUserId !== actor.id) {
+      void pushToUser(assigneeUserId, {
+        title: 'You’ve been assigned a task',
+        body: title.slice(0, 140),
+        url: '/board',
+        tag: `task-assigned-${created.id}`,
+      });
+    }
+    void pushToUsers(
+      collaboratorIds.filter((id) => id !== actor.id),
+      { title: 'Added to a task', body: title.slice(0, 140), url: '/board', tag: `task-collab-${created.id}` },
+    );
     return toManaged(created);
   });
 
@@ -415,6 +429,15 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       }
       const updated = await prisma.task.update({ where: { id: task.id }, data, include: managedInclude });
       req.log.info({ audit: 'task.plan.updated', taskId: task.id, by: user.id, approved: updated.planApproved }, 'audit');
+      // Tell the assignee their steps are final (only on the transition to approved).
+      if (req.body?.approved === true && updated.assigneeUserId && updated.assigneeUserId !== user.id) {
+        void pushToUser(updated.assigneeUserId, {
+          title: 'Your task steps are ready',
+          body: (updated.displayTitle ?? updated.title).slice(0, 140),
+          url: '/board',
+          tag: `task-plan-${updated.id}`,
+        });
+      }
       return toManaged(updated);
     },
   );
@@ -471,6 +494,16 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       body: c.body,
       createdAt: c.createdAt.toISOString(),
     };
+    // Notify the other people on the task (assignee, creator, collaborators).
+    void pushToUsers(
+      [task.assigneeUserId, task.createdByUserId, ...task.members.map((m) => m.userId)].filter((id) => id !== user.id),
+      {
+        title: `New comment from ${c.user.githubLogin}`,
+        body: c.body.slice(0, 140),
+        url: '/board',
+        tag: `task-comment-${task.id}`,
+      },
+    );
     return reply.code(201).send(dto);
   });
 

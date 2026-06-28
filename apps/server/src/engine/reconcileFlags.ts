@@ -7,6 +7,16 @@ import { hasConcurrency, unionMinutes } from './sessionMath';
 import { dominantActivity } from './activity';
 import { TEAM_ACTIVITIES } from '@cadence/shared';
 import { localToday, resolveTz, startOfLocalDay } from '../lib/tz';
+import { pushToUser } from '../services/push';
+
+// Friendly one-liners for the push body, keyed by flag type.
+const FLAG_LABEL: Record<FlagCandidate['type'], string> = {
+  open_no_activity: 'An open task has had no recent activity',
+  activity_no_session: 'Work landed with no session running',
+  long_open_session: 'A session has been open a long time',
+  overrun: 'A task has overrun its estimate',
+  duplicate_session: 'Overlapping sessions detected',
+};
 
 /**
  * Generate one inferred ActivitySegment per recent session that has commits but
@@ -71,6 +81,12 @@ export async function persistFlagCandidate(db: Db, c: FlagCandidate): Promise<bo
   });
   // Lightweight audit trail (P6).
   console.log(JSON.stringify({ audit: 'flag.created', flagId: created.id, type: c.type, userId: c.userId }));
+  void pushToUser(c.userId, {
+    title: 'New flag on your work',
+    body: FLAG_LABEL[c.type] ?? c.detail.slice(0, 140),
+    url: '/board',
+    tag: `flag-${created.id}`,
+  });
   return true;
 }
 

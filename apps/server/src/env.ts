@@ -60,6 +60,13 @@ export const env = {
   MAX_OPEN_HOURS: num('MAX_OPEN_HOURS', 8),
   OVERRUN_FACTOR: num('OVERRUN_FACTOR', 1.5),
 
+  // Web Push (VAPID). Optional: when the keys are unset, push endpoints report
+  // disabled, no client prompt is shown, and send hooks are no-ops. Generate a
+  // pair with `npx web-push generate-vapid-keys`; the private key is a secret.
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY ?? '',
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY ?? '',
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT ?? 'mailto:admin@cadence.app',
+
   // DeepSeek (AI task step-breakdown). Optional: when DEEPSEEK_API_KEY is unset
   // the plan-generation endpoint returns 503. OpenAI-compatible chat completions.
   DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ?? '',
@@ -68,5 +75,8 @@ export const env = {
 
   get isProd() {
     return this.NODE_ENV === 'production';
+  },
+  get pushEnabled() {
+    return !!(this.VAPID_PUBLIC_KEY && this.VAPID_PRIVATE_KEY);
   },
 };

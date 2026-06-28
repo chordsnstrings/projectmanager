@@ -47,6 +47,7 @@ afterAll(async () => {
   if (!available) return;
   await prisma.question.deleteMany({ where: { targetUserId: devId } });
   await prisma.dailyCheckin.deleteMany({ where: { userId: { in: [adminId, devId] } } });
+  await prisma.pushSubscription.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.session.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.user.deleteMany({ where: { id: { in: [adminId, devId] } } });
   await app.close();
@@ -703,5 +704,27 @@ describe('authed API integration', () => {
     expect((await app.inject({ method: 'GET', url: '/dashboard/checkins', headers: { cookie: devCookie } })).statusCode).toBe(403);
 
     await prisma.dailyCheckin.deleteMany({ where: { userId: devId } });
+  });
+
+  it('push: reports config state and gates subscribe when VAPID is unset', async () => {
+    if (!available) return;
+    // No VAPID keys in the test env → push is reported disabled.
+    const pk = await app.inject({ method: 'GET', url: '/push/public-key', headers: { cookie: devCookie } });
+    expect(pk.statusCode).toBe(200);
+    expect(pk.json().enabled).toBe(false);
+    expect(pk.json().key).toBeNull();
+
+    // Subscribing is rejected while push is disabled; anonymous is unauthorized.
+    const sub = await app.inject({
+      method: 'POST',
+      url: '/push/subscribe',
+      headers: { cookie: devCookie },
+      payload: { endpoint: 'https://example.com/x', keys: { p256dh: 'a', auth: 'b' } },
+    });
+    expect(sub.statusCode).toBe(503);
+    expect((await app.inject({ method: 'POST', url: '/push/subscribe', payload: {} })).statusCode).toBe(401);
+
+    // Unsubscribe is always safe (idempotent no-op).
+    expect((await app.inject({ method: 'POST', url: '/push/unsubscribe', headers: { cookie: devCookie }, payload: { endpoint: 'https://example.com/x' } })).statusCode).toBe(200);
   });
 });

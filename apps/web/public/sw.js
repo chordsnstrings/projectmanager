@@ -2,14 +2,14 @@
 // installability criteria. Deliberately simple: it never caches API/auth
 // responses (always live data), serves hashed build assets cache-first, and
 // falls back to the cached shell for navigations when offline.
-const VERSION = 'cadence-v2';
+const VERSION = 'cadence-v3';
 const SHELL = `${VERSION}-shell`;
 const ASSETS = `${VERSION}-assets`;
 
 // Path prefixes owned by the API — never cache these.
 const API_PREFIXES = [
   '/healthz', '/me', '/api', '/auth', '/webhooks', '/tasks', '/sessions',
-  '/dashboard', '/flags', '/questions', '/nudges', '/completions',
+  '/dashboard', '/flags', '/questions', '/nudges', '/completions', '/push',
 ];
 
 self.addEventListener('install', (event) => {
@@ -71,4 +71,43 @@ self.addEventListener('fetch', (event) => {
       }),
     );
   }
+});
+
+// ── Web Push ────────────────────────────────────────────────────────────────
+// Render an incoming push as a notification. Payload is JSON from the server:
+// { title, body, url, tag }.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'Cadence', body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'Cadence';
+  const options = {
+    body: data.body || '',
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: { url: data.url || '/' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Focus an existing tab (navigating it to the target) or open a new one.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          if ('navigate' in client) client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
 });

@@ -93,6 +93,7 @@ model User {
   taskMemberships TaskMember[]
   taskComments TaskComment[]
   dailyCheckins DailyCheckin[]
+  pushSubscriptions PushSubscription[]
   flags       Flag[]
   questions   Question[]  @relation("QuestionTarget")
   createdAt   DateTime    @default(now())
@@ -197,6 +198,21 @@ model DailyCheckin {
 
   @@unique([userId, localDate])
   @@index([userId, localDate])
+}
+
+// A browser/PWA Web Push subscription (one per device/browser per user).
+model PushSubscription {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  endpoint  String    @unique // push service URL; the subscription identity
+  p256dh    String    // client public key (base64url)
+  auth      String    // client auth secret (base64url)
+  userAgent String?   // best-effort label for the device list
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // soft-deleted when the push service reports it's gone (404/410)
+
+  @@index([userId])
 }
 
 // A discussion comment on a task (giver ↔ receiver back-and-forth).

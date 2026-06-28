@@ -3,6 +3,7 @@ import { prisma } from '@cadence/db';
 import type { AnswerQuestionBody, QuestionDTO, RaiseQuestionBody } from '@cadence/shared';
 import { assertCanViewUser, requireManager, requireUser } from '../auth/require';
 import { taskDisplayTitle, taskOrigin } from '../services/map';
+import { pushToUser } from '../services/push';
 
 // Minimal task shape needed to label a question with its task context.
 const taskCtxSelect = {
@@ -99,6 +100,12 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       { audit: 'question.raised', questionId: q.id, by: mgr.id, target: targetUserId, taskId, blocksNext: q.blocksNext },
       'audit',
     );
+    void pushToUser(targetUserId, {
+      title: q.blocksNext ? 'A question is blocking your next task' : 'New question for you',
+      body: body.slice(0, 140),
+      url: '/board',
+      tag: `question-${q.id}`,
+    });
     return reply.code(201).send(
       toDTO(q, (await loadTaskCtx([q.taskId])).get(q.taskId), (await loadLogins([q.targetUserId])).get(q.targetUserId)),
     );

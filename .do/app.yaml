@@ -51,6 +51,13 @@ services:
       - { key: DIGEST_TO, scope: RUN_TIME }
       # Static bearer token for the external activity-check robot (/api/integrations/*).
       - { key: CADENCE_API_TOKEN, scope: RUN_TIME, type: SECRET }
+      # Web Push (VAPID). Generate a pair with `npx web-push generate-vapid-keys`
+      # and set the values in the DO Control Panel / via API. The public key is
+      # not secret (it's sent to every browser); the private key is. Push is
+      # dormant until both are present (toggle hidden, endpoints report disabled).
+      - { key: VAPID_PUBLIC_KEY, scope: RUN_TIME }
+      - { key: VAPID_SUBJECT, scope: RUN_TIME, value: "mailto:chordsnstrings@users.noreply.github.com" }
+      - { key: VAPID_PRIVATE_KEY, scope: RUN_TIME, type: SECRET }
 jobs:
   - name: migrate
     kind: PRE_DEPLOY

@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.5',
+    date: '2026-06-28',
+    title: 'Push notifications',
+    items: [
+      'Turn on notifications (the 🔔 in the top bar) to get pinged about questions, flags on your work, task assignments, approved plans, and new comments — even when Cadence is closed.',
+      'Works on the installed app and supported browsers; enable per device.',
+    ],
+  },
+  {
     version: '1.4',
     date: '2026-06-25',
     title: 'Start your day with a check-in',
