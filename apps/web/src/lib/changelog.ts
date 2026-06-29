@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.6',
+    date: '2026-06-28',
+    title: 'Connect git to your tasks',
+    items: [
+      'Connect a manually-created task to git right from your board — create a new branch or link an existing one by name.',
+    ],
+  },
+  {
     version: '1.5',
     date: '2026-06-28',
     title: 'Push notifications',

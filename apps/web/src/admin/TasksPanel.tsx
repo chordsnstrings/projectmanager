@@ -421,7 +421,7 @@ function TaskRow({
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <span className="label">create git branch</span>
+              <span className="label">connect git</span>
               <div className="flex flex-wrap items-center gap-2">
                 <select value={repoId} onChange={(e) => setRepoId(e.target.value)} className="field h-9 px-2.5 text-xs font-mono min-w-[12rem] [color-scheme:dark]">
                   <option value="">— pick a repo —</option>
@@ -429,11 +429,14 @@ function TaskRow({
                     <option key={r.id} value={r.id}>{r.fullName}</option>
                   ))}
                 </select>
-                <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="branch (auto)" className="field h-9 px-2.5 text-xs font-mono w-44" />
+                <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="branch (new or existing)" className="field h-9 px-2.5 text-xs font-mono w-48" />
                 <button type="button" onClick={createBranch} disabled={!repoId || busy} className="btn btn-sm btn-ghost">
-                  {busy ? 'creating…' : 'Create branch'}
+                  {busy ? 'connecting…' : 'Connect'}
                 </button>
               </div>
+              <span className="font-mono text-[10px] text-text3">
+                Leave the branch blank to auto-name a new one, or type an existing branch to link it.
+              </span>
               {gitErr && <span className="font-mono text-[11px] text-danger">{gitErr}</span>}
             </div>
           )}

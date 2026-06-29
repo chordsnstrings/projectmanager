@@ -10,6 +10,7 @@ import type {
 import { fmtDuration, liveElapsed } from '../lib/format';
 import { ActivityDot, activityColor } from './activityDot';
 import TaskDiscussion from '../components/TaskDiscussion';
+import TaskGitConnect from '../components/TaskGitConnect';
 
 export type TaskRowState = 'idle' | 'running' | 'wrapping';
 
@@ -46,6 +47,8 @@ export interface TaskRowProps {
   ) => void;
   /** rename the task in-app only (Cadence-local; not pushed to GitHub) */
   onRename?: (taskId: string, title: string) => void;
+  /** refresh the board (e.g. after connecting git) */
+  onRefresh?: () => void;
 }
 
 const noop = () => {};
@@ -123,6 +126,7 @@ export default function TaskRow({
   onOverrideActivity = noop,
   onSaveSummary = noop,
   onRename = noop,
+  onRefresh = noop,
   activityKeys,
 }: TaskRowProps) {
   const running = state === 'running';
@@ -285,6 +289,7 @@ export default function TaskRow({
           ) : task.plan && !task.planApproved ? (
             <div className="font-mono text-[11px] text-text3">Steps are being prepared — pending approval.</div>
           ) : null}
+          {task.source === 'manual' && <TaskGitConnect task={task} onConnected={onRefresh} />}
           <div className="border-t border-hair pt-3">
             <TaskDiscussion taskId={task.id} />
           </div>

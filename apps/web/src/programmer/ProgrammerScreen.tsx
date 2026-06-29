@@ -333,6 +333,7 @@ export default function ProgrammerScreen({
                   onOverrideActivity={onOverrideActivity}
                   onSaveSummary={onSaveSummary}
                   onRename={onRename}
+                  onRefresh={onRefresh}
                   activityKeys={activityKeys}
                 />
               );
