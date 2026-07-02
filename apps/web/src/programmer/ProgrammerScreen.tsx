@@ -14,6 +14,7 @@ import TaskRow, { type TaskRowState } from './TaskRow';
 import { Logo } from '../components/Logo';
 import InstallButton from '../components/InstallButton';
 import NotificationToggle from '../components/NotificationToggle';
+import { GuideButton } from '../GuideModal';
 import { liveElapsed } from '../lib/format';
 import QuestionsForDev from './QuestionsForDev';
 import TaskPool from './TaskPool';
@@ -227,6 +228,7 @@ export default function ProgrammerScreen({
             <span className={syncing ? 'animate-spin' : ''} aria-hidden>↻</span>
             <span className="hidden sm:inline">{syncing ? 'syncing…' : `synced ${syncedAgo}`}</span>
           </button>
+          <GuideButton />
           <NotificationToggle />
           <InstallButton />
           <button

@@ -12,9 +12,10 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.6',
     date: '2026-06-28',
-    title: 'Connect git to your tasks',
+    title: 'Connect git to your tasks & a built-in guide',
     items: [
       'Connect a manually-created task to git right from your board — create a new branch or link an existing one by name.',
+      'New “How Cadence works” guide — tap the ? in the top bar for a walkthrough of the system and flow, tailored to your role and team.',
     ],
   },
   {

@@ -32,6 +32,7 @@ import Onboarding from './Onboarding';
 import UpdateModal from './UpdateModal';
 import UpdateToast from './UpdateToast';
 import CheckinModal from './CheckinModal';
+import GuideModal, { GuideButton, openGuide } from './GuideModal';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -114,9 +115,18 @@ export default function App() {
 
   if (auth.kind === 'loading') return <Splash>connecting…</Splash>;
   if (auth.kind === 'anon') return <SignIn />;
-  // First-run: must pick a team before anything else.
+  // First-run: must pick a team before anything else. Right after, open the
+  // guide once so new users get the system + flow explained (deferred a tick so
+  // the GuideModal listener is mounted before the event fires).
   if (!auth.me.onboardingComplete) {
-    return <Onboarding onDone={(me) => setAuth({ kind: 'authed', me })} />;
+    return (
+      <Onboarding
+        onDone={(me) => {
+          setAuth({ kind: 'authed', me });
+          window.setTimeout(openGuide, 400);
+        }}
+      />
+    );
   }
   // One-time "what's new" modal, acknowledged per user.
   const ackVersion = (version: string) => {
@@ -131,6 +141,7 @@ export default function App() {
     <>
       {screen}
       <CheckinModal me={auth.me} />
+      <GuideModal me={auth.me} />
       <UpdateModal me={auth.me} onAck={ackVersion} />
       <UpdateToast />
     </>
@@ -792,6 +803,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           </span>
         </div>
         <div className="flex items-center gap-1.5">
+          <GuideButton />
           <NotificationToggle />
           <InstallButton />
           <button onClick={signOut} className="btn btn-sm btn-ghost">
