@@ -27,6 +27,7 @@ type UserWithTeam = {
   teamId: string | null;
   team: { key: string } | null;
   lastSeenVersion: string | null;
+  tourSeenAt: Date | null;
 };
 
 function toMe(user: UserWithTeam): Me {
@@ -43,6 +44,7 @@ function toMe(user: UserWithTeam): Me {
     teamKey: user.team?.key ?? null,
     onboardingComplete: user.teamId != null,
     lastSeenVersion: user.lastSeenVersion,
+    tourSeen: user.tourSeenAt != null,
   };
 }
 
@@ -166,6 +168,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
     const user = await prisma.user.update({ where: { id: userId }, data });
     return { stopOnCommit: user.stopOnCommit, timezone: user.timezone };
+  });
+
+  // Mark the first-login walkthrough as taken (finished or skipped).
+  app.post('/me/tour-seen', async (req, reply) => {
+    const userId = getSessionUserId(req);
+    if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
+    await prisma.user.update({ where: { id: userId }, data: { tourSeenAt: new Date() } });
+    return { ok: true };
   });
 
   // Acknowledge the "what's new" modal for a changelog version (one-time per user).

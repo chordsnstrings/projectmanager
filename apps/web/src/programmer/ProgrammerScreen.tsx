@@ -208,7 +208,7 @@ export default function ProgrammerScreen({
           <span className="hidden sm:inline text-sm font-medium text-text2 tracking-tightish truncate">{date}</span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <button type="button" onClick={() => onOpenDay()} className="btn btn-sm btn-ghost" title="review your day timeline">
+          <button type="button" data-tour="myday" onClick={() => onOpenDay()} className="btn btn-sm btn-ghost" title="review your day timeline">
             My day
           </button>
           <button type="button" onClick={() => onOpenProgress()} className="btn btn-sm btn-ghost" title="your progress & completed work">
@@ -246,6 +246,7 @@ export default function ProgrammerScreen({
         {productivity && (
           <button
             type="button"
+            data-tour="prod"
             onClick={() => onOpenProgress()}
             className="card px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-left hover:bg-surface/40 transition-colors"
             title="open your progress"
@@ -298,7 +299,7 @@ export default function ProgrammerScreen({
         )}
 
         {/* Task list */}
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden" data-tour="tasks">
           {tasks.length === 0 ? (
             <div className="px-6 py-14 text-center flex flex-col items-center">
               <span className="w-10 h-10 rounded-full border border-hair2 inline-flex items-center justify-center text-text3 mb-4" aria-hidden>
@@ -344,7 +345,9 @@ export default function ProgrammerScreen({
         </div>
 
         {/* Non-git activity: quick-start labels + same-day backfill */}
-        <AddActivity onStartLabeled={onStartLabeled} onBackfill={onBackfill} />
+        <div data-tour="addactivity">
+          <AddActivity onStartLabeled={onStartLabeled} onBackfill={onBackfill} />
+        </div>
 
         {/* Footer: settings + hint */}
         <div className="mt-2 pt-5 border-t border-hair flex flex-col items-center gap-2.5">

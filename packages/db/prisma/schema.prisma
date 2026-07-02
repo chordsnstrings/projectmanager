@@ -88,6 +88,7 @@ model User {
   teamId      String?     // null only until onboarding picks a team
   team        Team?       @relation(fields: [teamId], references: [id])
   lastSeenVersion String?  // most recent changelog version this user has acknowledged
+  tourSeenAt  DateTime?   // finished/skipped the first-login walkthrough
   emails      UserEmail[]
   sessions    Session[]
   taskMemberships TaskMember[]

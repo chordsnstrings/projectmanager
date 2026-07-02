@@ -31,7 +31,7 @@ export default function NotificationToggle({ compact = false }: { compact?: bool
 
   if (state === 'denied') {
     return (
-      <div className={`font-mono text-[11px] text-text3 ${compact ? '' : 'flex items-center gap-2'}`}>
+      <div data-tour="bell" className={`font-mono text-[11px] text-text3 ${compact ? '' : 'flex items-center gap-2'}`}>
         notifications blocked — enable them in your browser settings
       </div>
     );
@@ -40,6 +40,7 @@ export default function NotificationToggle({ compact = false }: { compact?: bool
   const on = state === 'on';
   return (
     <button
+      data-tour="bell"
       onClick={toggle}
       disabled={busy}
       className={`btn btn-sm ${on ? 'btn-ghost text-success' : 'btn-ghost'}`}

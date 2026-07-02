@@ -706,6 +706,16 @@ describe('authed API integration', () => {
     await prisma.dailyCheckin.deleteMany({ where: { userId: devId } });
   });
 
+  it('walkthrough: tourSeen starts false and flips after /me/tour-seen', async () => {
+    if (!available) return;
+    const me0 = await app.inject({ method: 'GET', url: '/me', headers: { cookie: devCookie } });
+    expect(me0.json().tourSeen).toBe(false);
+    expect((await app.inject({ method: 'POST', url: '/me/tour-seen', headers: { cookie: devCookie }, payload: {} })).statusCode).toBe(200);
+    const me1 = await app.inject({ method: 'GET', url: '/me', headers: { cookie: devCookie } });
+    expect(me1.json().tourSeen).toBe(true);
+    await prisma.user.update({ where: { id: devId }, data: { tourSeenAt: null } });
+  });
+
   it('push: reports config state and gates subscribe when VAPID is unset', async () => {
     if (!available) return;
     // No VAPID keys in the test env → push is reported disabled.

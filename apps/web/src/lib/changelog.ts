@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7',
+    date: '2026-07-02',
+    title: 'A guided walkthrough',
+    items: [
+      'New interactive walkthrough that tours the actual screens — it runs once on your first visit, and you can replay it any time from the ? guide.',
+    ],
+  },
+  {
     version: '1.6',
     date: '2026-06-28',
     title: 'Connect git to your tasks & a built-in guide',

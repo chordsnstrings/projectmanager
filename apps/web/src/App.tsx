@@ -32,7 +32,8 @@ import Onboarding from './Onboarding';
 import UpdateModal from './UpdateModal';
 import UpdateToast from './UpdateToast';
 import CheckinModal from './CheckinModal';
-import GuideModal, { GuideButton, openGuide } from './GuideModal';
+import GuideModal, { GuideButton } from './GuideModal';
+import Walkthrough from './Walkthrough';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -115,18 +116,10 @@ export default function App() {
 
   if (auth.kind === 'loading') return <Splash>connecting…</Splash>;
   if (auth.kind === 'anon') return <SignIn />;
-  // First-run: must pick a team before anything else. Right after, open the
-  // guide once so new users get the system + flow explained (deferred a tick so
-  // the GuideModal listener is mounted before the event fires).
+  // First-run: must pick a team before anything else. The walkthrough then
+  // auto-runs on the board (tourSeen is still false for a brand-new user).
   if (!auth.me.onboardingComplete) {
-    return (
-      <Onboarding
-        onDone={(me) => {
-          setAuth({ kind: 'authed', me });
-          window.setTimeout(openGuide, 400);
-        }}
-      />
-    );
+    return <Onboarding onDone={(me) => setAuth({ kind: 'authed', me })} />;
   }
   // One-time "what's new" modal, acknowledged per user.
   const ackVersion = (version: string) => {
@@ -140,9 +133,14 @@ export default function App() {
   return (
     <>
       {screen}
-      <CheckinModal me={auth.me} />
+      {/* Hold the check-in back until the walkthrough has run — one overlay at a time. */}
+      {auth.me.tourSeen && <CheckinModal me={auth.me} />}
+      <Walkthrough
+        me={auth.me}
+        onSeen={() => setAuth({ kind: 'authed', me: { ...auth.me, tourSeen: true } })}
+      />
       <GuideModal me={auth.me} />
-      <UpdateModal me={auth.me} onAck={ackVersion} />
+      {auth.me.tourSeen && <UpdateModal me={auth.me} onAck={ackVersion} />}
       <UpdateToast />
     </>
   );
@@ -781,6 +779,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
   const tabBtn = (t: AdminTab, label: string) => (
     <button
+      data-tour={`tab-${t}`}
       onClick={() => navigate(`/admin/${t}`)}
       className={`btn btn-sm ${
         tab === t
@@ -820,6 +819,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
         {tabBtn('questions', 'Questions')}
         {isOwner && teamsList.length > 0 && (
           <select
+            data-tour="teamfilter"
             value={teamFilter}
             onChange={(e) => setTeamFilter(e.target.value)}
             className="field h-8 px-2.5 text-xs font-mono ml-auto [color-scheme:dark]"

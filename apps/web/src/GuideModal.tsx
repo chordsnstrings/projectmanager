@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Me } from '@cadence/shared';
 import { Logo } from './components/Logo';
 import { TEAM_ACTIVITIES } from './lib/activity';
+import { startTour } from './Walkthrough';
 
 /**
  * "How Cadence works" — an in-app guide to the system and flow, tailored to the
@@ -16,6 +17,7 @@ export function openGuide(): void {
 export function GuideButton() {
   return (
     <button
+      data-tour="guide"
       onClick={openGuide}
       className="btn btn-sm btn-ghost"
       title="How Cadence works"
@@ -204,8 +206,16 @@ export default function GuideModal({ me }: { me: Me }) {
           ))}
         </div>
 
-        <footer className="flex items-center justify-between pt-1 border-t border-hair">
-          <span className="font-mono text-[10px] text-text3">open any time from the ? in the top bar</span>
+        <footer className="flex items-center justify-between gap-3 pt-1 border-t border-hair">
+          <button
+            onClick={() => {
+              setOpen(false);
+              startTour();
+            }}
+            className="btn btn-md btn-ghost"
+          >
+            ▶ take the walkthrough
+          </button>
           <button onClick={() => setOpen(false)} className="btn btn-md btn-primary">
             Got it
           </button>

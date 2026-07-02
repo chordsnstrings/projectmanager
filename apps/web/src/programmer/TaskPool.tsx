@@ -30,14 +30,14 @@ export default function TaskPool({
   // Hide entirely when there's nothing to pick up and you're not adding one.
   if (pool.length === 0 && !creating) {
     return (
-      <button onClick={() => setCreating(true)} className="self-start font-mono text-[11px] text-text3 hover:text-text2">
+      <button data-tour="pool" onClick={() => setCreating(true)} className="self-start font-mono text-[11px] text-text3 hover:text-text2">
         + add a task
       </button>
     );
   }
 
   return (
-    <section className="card overflow-hidden">
+    <section className="card overflow-hidden" data-tour="pool">
       <div className="px-4 py-2.5 border-b border-hair flex items-center justify-between">
         <span className="label">open tasks · pick up{pool.length ? ` · ${pool.length}` : ''}</span>
         {!creating && (
