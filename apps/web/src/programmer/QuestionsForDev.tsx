@@ -7,15 +7,21 @@ function OpenQuestion({
   onAnswer,
 }: {
   question: QuestionDTO;
-  onAnswer: (id: string, answer: string) => void;
+  onAnswer: (id: string, answer: string) => void | Promise<void>;
 }) {
   const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  function submit() {
+  async function submit() {
     const trimmed = text.trim();
-    if (trimmed.length === 0) return;
-    onAnswer(question.id, trimmed);
-    setText('');
+    if (trimmed.length === 0 || busy) return;
+    setBusy(true);
+    try {
+      await onAnswer(question.id, trimmed);
+      setText('');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -54,10 +60,10 @@ function OpenQuestion({
         <button
           type="button"
           onClick={submit}
-          disabled={text.trim().length === 0}
+          disabled={text.trim().length === 0 || busy}
           className="btn btn-md btn-primary disabled:bg-surface2 disabled:text-text3"
         >
-          Answer
+          {busy ? 'sending…' : 'Answer'}
         </button>
       </div>
     </li>
@@ -69,7 +75,7 @@ export default function QuestionsForDev({
   onAnswer,
 }: {
   questions: QuestionDTO[];
-  onAnswer: (id: string, answer: string) => void;
+  onAnswer: (id: string, answer: string) => void | Promise<void>;
 }) {
   const open = questions.filter((q) => q.status === 'open');
   if (open.length === 0) return null;

@@ -1051,6 +1051,18 @@ function EmptyState({ children }: { children: React.ReactNode }) {
 
 function DateNav({ date, setDate }: { date: string; setDate: React.Dispatch<React.SetStateAction<string>> }) {
   const isToday = date === todayStr();
+  // ←/→ step through days — a natural reflex on a timeline view. Ignored while
+  // typing in any field so it never fights text editing.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.key === 'ArrowLeft') setDate((d) => shiftDate(d, -1));
+      if (e.key === 'ArrowRight' && date !== todayStr()) setDate((d) => shiftDate(d, 1));
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [setDate, date]);
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       <button
