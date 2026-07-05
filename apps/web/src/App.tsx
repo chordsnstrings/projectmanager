@@ -554,6 +554,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onOpenProgress={() => navigate('/board/progress')}
         productivity={productivity}
         activityKeys={activityKeysFor(me.teamKey)}
+        teamKey={me.teamKey}
         pool={pool}
         onClaim={onClaim}
         onCreateTask={onCreateTask}

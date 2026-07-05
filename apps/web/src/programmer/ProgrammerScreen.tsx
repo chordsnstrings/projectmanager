@@ -35,6 +35,8 @@ export interface ProgrammerScreenProps {
   nudge?: NudgeDTO | null;
   /** the current user's team activity keys (one-tap cycle) */
   activityKeys?: string[];
+  /** team registry key — tailors copy (git-synced teams vs manual-task teams) */
+  teamKey?: string | null;
   /** claimable unassigned team tasks */
   pool?: TaskDTO[];
   onClaim?: (taskId: string) => void;
@@ -206,6 +208,7 @@ export default function ProgrammerScreen({
   date,
   nudge,
   activityKeys,
+  teamKey = null,
   pool = [],
   onClaim = noop,
   onCreateTask = noop,
@@ -319,25 +322,38 @@ export default function ProgrammerScreen({
         {/* Task list */}
         <div className="card overflow-hidden" data-tour="tasks">
           {tasks.length === 0 ? (
-            <div className="px-6 py-14 text-center flex flex-col items-center">
-              <span className="w-10 h-10 rounded-full border border-hair2 inline-flex items-center justify-center text-text3 mb-4" aria-hidden>
-                <span className="text-base leading-none">⌥</span>
-              </span>
-              <div className="text-sm text-text font-medium mb-1.5">No projects synced yet</div>
-              <p className="text-xs text-text3 leading-relaxed max-w-sm mx-auto mb-5">
-                Cadence pulls your assigned issues, open PRs, and recently-active repos from
-                GitHub. If this stays empty, you may have no recent activity on accessible repos.
-              </p>
-              <button
-                type="button"
-                onClick={() => onRefresh()}
-                disabled={syncing}
-                className="btn btn-md btn-ghost"
-              >
-                <span className={syncing ? 'animate-spin' : ''} aria-hidden>↻</span>
-                {syncing ? 'syncing…' : 'Refresh from GitHub'}
-              </button>
-            </div>
+            teamKey === 'marketing' ? (
+              <div className="px-6 py-14 text-center flex flex-col items-center">
+                <span className="w-10 h-10 rounded-full border border-hair2 inline-flex items-center justify-center text-text3 mb-4" aria-hidden>
+                  <span className="text-base leading-none">✺</span>
+                </span>
+                <div className="text-sm text-text font-medium mb-1.5">No tasks yet</div>
+                <p className="text-xs text-text3 leading-relaxed max-w-sm mx-auto">
+                  Pick up an open task from the team pool above, or add your own with
+                  “+ new task” — then press ▶ to start the clock on it.
+                </p>
+              </div>
+            ) : (
+              <div className="px-6 py-14 text-center flex flex-col items-center">
+                <span className="w-10 h-10 rounded-full border border-hair2 inline-flex items-center justify-center text-text3 mb-4" aria-hidden>
+                  <span className="text-base leading-none">⌥</span>
+                </span>
+                <div className="text-sm text-text font-medium mb-1.5">No projects synced yet</div>
+                <p className="text-xs text-text3 leading-relaxed max-w-sm mx-auto mb-5">
+                  Cadence pulls your assigned issues, open PRs, and recently-active repos from
+                  GitHub. If this stays empty, you may have no recent activity on accessible repos.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onRefresh()}
+                  disabled={syncing}
+                  className="btn btn-md btn-ghost"
+                >
+                  <span className={syncing ? 'animate-spin' : ''} aria-hidden>↻</span>
+                  {syncing ? 'syncing…' : 'Refresh from GitHub'}
+                </button>
+              </div>
+            )
           ) : (
             tasks.map((task) => {
               const s = sessionsByTask[task.id] ?? { state: 'idle' as TaskRowState };
