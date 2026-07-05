@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { BlockerKey, CarryoverItem, CarryoverStatus, CheckinPrompt, Me } from '@cadence/shared';
 import { api } from './lib/api';
 import { Logo } from './components/Logo';
+import { useLockBodyScroll } from './lib/useModal';
 
 /**
  * Morning "start your day" check-in. Asked once per local day for onboarded team
@@ -53,6 +54,7 @@ function fmtMinutes(min: number): string {
 }
 
 function CheckinForm({ prompt, onClose }: { prompt: CheckinPrompt; onClose: () => void }) {
+  useLockBodyScroll();
   const [productivity, setProductivity] = useState<number | null>(null);
   const [carry, setCarry] = useState<Record<string, CarryoverStatus>>({});
   const [blocker, setBlocker] = useState<BlockerKey | null>(null);

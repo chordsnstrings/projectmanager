@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLockBodyScroll } from '../lib/useModal';
 
 /**
  * Design-system confirm dialog replacing window.confirm. Promise-based:
@@ -48,6 +49,8 @@ export default function ConfirmDialogHost() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  useLockBodyScroll(opts != null);
 
   if (!opts) return null;
   return (

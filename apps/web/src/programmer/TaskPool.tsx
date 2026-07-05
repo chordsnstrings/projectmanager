@@ -82,9 +82,19 @@ export default function TaskPool({
 
 /** A claimable pool task. Expands to show the brief + discussion so anyone can
  *  read the prior conversation before picking it up. */
-function PoolRow({ task, onClaim }: { task: TaskDTO; onClaim: (taskId: string) => void }) {
+function PoolRow({ task, onClaim }: { task: TaskDTO; onClaim: (taskId: string) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const hasDetails = !!task.description || task.source === 'manual';
+  const claim = async () => {
+    if (claiming) return;
+    setClaiming(true);
+    try {
+      await onClaim(task.id);
+    } finally {
+      setClaiming(false);
+    }
+  };
   return (
     <li className="border-b border-hair last:border-b-0">
       <div className="flex items-center gap-3 px-4 py-2.5">
@@ -101,8 +111,8 @@ function PoolRow({ task, onClaim }: { task: TaskDTO; onClaim: (taskId: string) =
           </div>
           <div className="font-mono text-[10px] text-text3">unassigned</div>
         </button>
-        <button onClick={() => onClaim(task.id)} className="btn btn-sm btn-ghost shrink-0">
-          pick up
+        <button onClick={claim} disabled={claiming} className="btn btn-sm btn-ghost shrink-0">
+          {claiming ? 'picking…' : 'pick up'}
         </button>
       </div>
       {open && hasDetails && (

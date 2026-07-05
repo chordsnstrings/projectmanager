@@ -77,8 +77,11 @@ function useRoute(): Route {
   }, []);
   const navigate = useCallback((to: string, replace = false) => {
     if (to === window.location.pathname + window.location.search) return;
+    const prevPath = window.location.pathname;
     window.history[replace ? 'replaceState' : 'pushState']({}, '', to);
     setLoc(to);
+    // New page (not just a query tweak like ?date=): start at the top.
+    if (to.split('?')[0] !== prevPath) window.scrollTo(0, 0);
   }, []);
   const q = loc.indexOf('?');
   const path = q === -1 ? loc : loc.slice(0, q);

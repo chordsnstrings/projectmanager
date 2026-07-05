@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useEscape, useLockBodyScroll } from './lib/useModal';
 import type { Me } from '@cadence/shared';
 import { APP_VERSION, entriesSince } from './lib/changelog';
 import { Logo } from './components/Logo';
@@ -10,6 +11,12 @@ import { Logo } from './components/Logo';
  */
 export default function UpdateModal({ me, onAck }: { me: Me; onAck: (version: string) => void }) {
   const [open, setOpen] = useState(true);
+  const showing = open && me.onboardingComplete && me.lastSeenVersion !== APP_VERSION && entriesSince(me.lastSeenVersion).length > 0;
+  useEscape(() => {
+    setOpen(false);
+    onAck(APP_VERSION);
+  }, showing);
+  useLockBodyScroll(showing);
 
   // Don't interrupt onboarding, and nothing to show if already current.
   if (!me.onboardingComplete || me.lastSeenVersion === APP_VERSION) return null;

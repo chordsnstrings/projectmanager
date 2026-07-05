@@ -3,6 +3,7 @@ import type { Me } from '@cadence/shared';
 import { Logo } from './components/Logo';
 import { TEAM_ACTIVITIES } from './lib/activity';
 import { startTour } from './Walkthrough';
+import { useEscape, useLockBodyScroll } from './lib/useModal';
 
 /**
  * "How Cadence works" — an in-app guide to the system and flow, tailored to the
@@ -147,6 +148,8 @@ export default function GuideModal({ me }: { me: Me }) {
     window.addEventListener('open-guide', h);
     return () => window.removeEventListener('open-guide', h);
   }, []);
+  useEscape(() => setOpen(false), open);
+  useLockBodyScroll(open);
 
   if (!open) return null;
   const isManager = me.role === 'admin' || me.role === 'lead';
