@@ -62,7 +62,7 @@ export interface ProgrammerScreenProps {
   /** running off-task sessions (no task row to control them from) */
   offTaskRunning?: SessionDTO[];
   /** stop a session directly (no wrap-up panel) — used for off-task */
-  onStopOffTask?: (sessionId: string) => void;
+  onStopOffTask?: (sessionId: string) => void | Promise<void>;
   /** open questions the dev must answer (gates next completion) */
   questions?: QuestionDTO[];
   onAnswerQuestion?: (id: string, answer: string) => void;
@@ -155,6 +155,38 @@ function NudgeBanner({
           <span className="font-mono text-[10px] text-text3 self-end">{intent.length}/300</span>
         </div>
       )}
+    </div>
+  );
+}
+
+function OffTaskRow({ session, onStop }: { session: SessionDTO; onStop: (id: string) => void | Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-hair last:border-b-0">
+      <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 animate-pulse" aria-hidden />
+      <span className="text-sm text-text2 flex-1 truncate">
+        {session.offTaskLabel ?? 'off-task'}
+        {session.intent ? ` · ${session.intent}` : ''}
+      </span>
+      <RunningTimer startedAt={session.startedAt} />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          if (busy) return;
+          setBusy(true);
+          try {
+            await onStop(session.id);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-hair2 text-danger hover:bg-danger/10 transition-colors disabled:opacity-60"
+        title="stop session"
+        aria-label="stop off-task session"
+      >
+        {busy ? <span className="animate-spin text-xs leading-none" aria-hidden>◌</span> : <span className="text-xs leading-none">■</span>}
+      </button>
     </div>
   );
 }
@@ -279,26 +311,7 @@ export default function ProgrammerScreen({
               off-task running · {offTaskRunning.length}
             </div>
             {offTaskRunning.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center gap-3 px-4 py-3 border-b border-hair last:border-b-0"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 animate-pulse" aria-hidden />
-                <span className="text-sm text-text2 flex-1 truncate">
-                  {s.offTaskLabel ?? 'off-task'}
-                  {s.intent ? ` · ${s.intent}` : ''}
-                </span>
-                <RunningTimer startedAt={s.startedAt} />
-                <button
-                  type="button"
-                  onClick={() => onStopOffTask(s.id)}
-                  className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-hair2 text-danger hover:bg-danger/10 transition-colors"
-                  title="stop session"
-                  aria-label="stop off-task session"
-                >
-                  <span className="text-xs leading-none">■</span>
-                </button>
-              </div>
+              <OffTaskRow key={s.id} session={s} onStop={onStopOffTask} />
             ))}
           </div>
         )}

@@ -44,7 +44,7 @@ export interface TaskRowProps {
   onSaveSummary?: (
     sessionId: string,
     payload: { summary: string; blocked: boolean; closesIssues: number[] },
-  ) => void;
+  ) => void | Promise<void>;
   /** rename the task in-app only (Cadence-local; not pushed to GitHub) */
   onRename?: (taskId: string, title: string) => void;
   /** refresh the board (e.g. after connecting git) */
@@ -398,6 +398,16 @@ function WrapPanel({
   const [summary, setSummary] = useState(draft.summary);
   const [blocked, setBlocked] = useState(session.blocked);
   const [closes, setCloses] = useState<number[]>(draft.closesIssues);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSaveSummary(session.id, { summary, blocked, closesIssues: closes });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleClose = (n: number) =>
     setCloses((cur) => (cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n]));
@@ -428,6 +438,7 @@ function WrapPanel({
       <input
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && save()}
         placeholder="one-line summary…"
         className="field w-full px-3 py-2 text-sm"
       />
@@ -460,12 +471,8 @@ function WrapPanel({
           </button>
         ))}
 
-        <button
-          type="button"
-          onClick={() => onSaveSummary(session.id, { summary, blocked, closesIssues: closes })}
-          className="ml-auto btn btn-sm btn-primary"
-        >
-          Save
+        <button type="button" onClick={save} disabled={saving} className="ml-auto btn btn-sm btn-primary">
+          {saving ? 'saving…' : 'Save'}
         </button>
       </div>
 
