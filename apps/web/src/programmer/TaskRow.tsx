@@ -36,8 +36,8 @@ export interface TaskRowProps {
   /** required when state === 'wrapping' */
   draft?: DraftSummary;
   commits?: CommitDTO[];
-  onStart?: (taskId: string, intent?: string) => void;
-  onStop?: (sessionId: string) => void;
+  onStart?: (taskId: string, intent?: string) => void | Promise<void>;
+  onStop?: (sessionId: string) => void | Promise<void>;
   onOverrideActivity?: (sessionId: string, activity: ActivityType) => void;
   /** the current user's team activity keys (for the one-tap cycle) */
   activityKeys?: string[];
@@ -136,15 +136,21 @@ export default function TaskRow({
   const [showDetails, setShowDetails] = useState(false);
   const [starting, setStarting] = useState(false);
   const [intentText, setIntentText] = useState('');
+  const [busy, setBusy] = useState(false);
   // Manual tasks (and anything with a brief/plan) carry a details panel:
   // description, the approved step-by-step, and a comment thread.
   const hasDetails = !!(task.description || task.plan) || task.source === 'manual';
-  const beginStart = () => {
+  const beginStart = async () => {
     const t = intentText.trim();
-    if (!t) return;
-    onStart(task.id, t);
-    setStarting(false);
-    setIntentText('');
+    if (!t || busy) return;
+    setBusy(true);
+    try {
+      await onStart(task.id, t);
+    } finally {
+      setBusy(false);
+      setStarting(false);
+      setIntentText('');
+    }
   };
 
   // The signature 3px left edge — only on a running row, colored by activity.
@@ -220,12 +226,21 @@ export default function TaskRow({
               </span>
               <button
                 type="button"
-                onClick={() => onStop(session.id)}
-                className="w-10 h-10 grid place-items-center rounded-full border border-danger/40 text-danger transition-all duration-150 ease-smooth hover:bg-danger/15 hover:border-danger/60 active:scale-90"
+                disabled={busy}
+                onClick={async () => {
+                  if (busy) return;
+                  setBusy(true);
+                  try {
+                    await onStop(session.id);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="w-10 h-10 grid place-items-center rounded-full border border-danger/40 text-danger transition-all duration-150 ease-smooth hover:bg-danger/15 hover:border-danger/60 active:scale-90 disabled:opacity-60"
                 title="stop session"
                 aria-label="stop session"
               >
-                <StopIcon />
+                {busy ? <span className="animate-spin text-xs leading-none" aria-hidden>◌</span> : <StopIcon />}
               </button>
             </>
           )}
@@ -267,7 +282,9 @@ export default function TaskRow({
               className="field h-9 px-3 text-sm flex-1"
             />
             <button type="button" onClick={() => setStarting(false)} className="btn btn-sm btn-ghost">cancel</button>
-            <button type="button" onClick={beginStart} disabled={!intentText.trim()} className="btn btn-sm btn-primary">Start</button>
+            <button type="button" onClick={beginStart} disabled={!intentText.trim() || busy} className="btn btn-sm btn-primary">
+              {busy ? 'starting…' : 'Start'}
+            </button>
           </div>
           <span className="font-mono text-[10px] text-text3 self-end">{intentText.length}/300</span>
         </div>

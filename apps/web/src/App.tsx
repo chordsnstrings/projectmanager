@@ -34,6 +34,8 @@ import UpdateToast from './UpdateToast';
 import CheckinModal from './CheckinModal';
 import GuideModal, { GuideButton } from './GuideModal';
 import Walkthrough from './Walkthrough';
+import Toasts, { toast } from './components/Toasts';
+import ConfirmDialogHost, { confirmDialog } from './components/ConfirmDialog';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
@@ -142,6 +144,8 @@ export default function App() {
       <GuideModal me={auth.me} />
       {auth.me.tourSeen && <UpdateModal me={auth.me} onAck={ackVersion} />}
       <UpdateToast />
+      <Toasts />
+      <ConfirmDialogHost />
     </>
   );
 }
@@ -253,14 +257,21 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         const body = e instanceof ApiError ? (e.body as { error?: string; readiness?: { score: number; missing: string[] } } | undefined) : undefined;
         if (e instanceof ApiError && e.status === 409 && body?.error === 'not_specified') {
           const r = body.readiness;
-          const ok = window.confirm(
-            `This task looks under-specified (${r?.score ?? 0}/100).\n` +
-              (r?.missing?.length ? `Missing: ${r.missing.join('; ')}\n\n` : '\n') +
-              'Pick it up anyway?',
-          );
-          if (ok) await api(`/tasks/${taskId}/claim`, { method: 'POST', body: JSON.stringify({ override: true }) }).catch(() => {});
+          const ok = await confirmDialog({
+            title: `This task looks under-specified (${r?.score ?? 0}/100)`,
+            body: r?.missing?.length ? `Missing: ${r.missing.join('; ')}` : undefined,
+            confirmLabel: 'Pick it up anyway',
+          });
+          if (ok) {
+            await api(`/tasks/${taskId}/claim`, { method: 'POST', body: JSON.stringify({ override: true }) }).catch(
+              () => toast('Couldn’t pick up the task', 'error'),
+            );
+          }
+        } else if (e instanceof ApiError && e.status === 409) {
+          toast('Already picked up by someone else', 'info');
+        } else {
+          toast('Couldn’t pick up the task', 'error');
         }
-        // already_claimed or other → fall through to refresh
       }
       await refresh();
     },
@@ -268,7 +279,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   );
   const onCreateTask = useCallback(
     async (title: string, estimateMinutes: number | null) => {
-      await api('/tasks', { method: 'POST', body: JSON.stringify({ title, estimateMinutes, assigneeUserId: me.id }) }).catch(() => {});
+      await api('/tasks', { method: 'POST', body: JSON.stringify({ title, estimateMinutes, assigneeUserId: me.id }) }).catch(
+        () => toast('Couldn’t create the task', 'error'),
+      );
       await refresh();
     },
     [refresh, me.id],
@@ -276,7 +289,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   const onAnswerQuestion = useCallback(
     async (id: string, answer: string) => {
-      await api(`/questions/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }).catch(() => {});
+      await api(`/questions/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }).catch(
+        () => toast('Couldn’t send your answer — try again', 'error'),
+      );
       await refresh();
     },
     [refresh],
@@ -351,7 +366,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       await api<SessionDTO>('/sessions', {
         method: 'POST',
         body: JSON.stringify({ taskId, intent: intent?.trim() ? intent.trim().slice(0, 300) : undefined }),
-      });
+      }).catch(() => toast('Couldn’t start the session', 'error'));
       await refresh();
     },
     [refresh],
@@ -370,7 +385,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       await api<SessionDTO>(`/sessions/${sessionId}/stop`, {
         method: 'POST',
         body: JSON.stringify(summary ? { summary } : {}),
-      }).catch(() => {});
+      }).catch(() => toast('Couldn’t stop the session — it’s still running', 'error'));
       await refresh();
     },
     [refresh],
@@ -378,7 +393,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   const onEditSummary = useCallback(
     async (sessionId: string, summary: string) => {
-      await api(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ summary }) }).catch(() => {});
+      await api(`/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ summary }) }).catch(
+        () => toast('Couldn’t save the summary', 'error'),
+      );
       await refresh();
     },
     [refresh],

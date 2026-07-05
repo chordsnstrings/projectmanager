@@ -3,6 +3,8 @@ import type { ManagedTask, MemberLite, RepoLite, TaskReadiness, TaskStatus } fro
 import { api, ApiError } from '../lib/api';
 import { fmtDuration } from '../lib/format';
 import TaskDiscussion from '../components/TaskDiscussion';
+import { confirmDialog } from '../components/ConfirmDialog';
+import { toast } from '../components/Toasts';
 
 const STATUSES: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done'];
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -449,9 +451,18 @@ function TaskRow({
             <button
               type="button"
               onClick={async () => {
-                if (busy || !confirm('Archive this task? It will be removed from the board.')) return;
+                if (busy) return;
+                const ok = await confirmDialog({
+                  title: 'Archive this task?',
+                  body: 'It will be removed from the board. Its sessions and history are kept.',
+                  confirmLabel: 'Archive',
+                  danger: true,
+                });
+                if (!ok) return;
                 setBusy(true);
-                await api(`/tasks/${task.id}`, { method: 'DELETE' }).catch(() => {});
+                await api(`/tasks/${task.id}`, { method: 'DELETE' })
+                  .then(() => toast('Task archived', 'success'))
+                  .catch(() => toast('Couldn’t archive the task', 'error'));
                 setBusy(false);
                 onChanged();
               }}
