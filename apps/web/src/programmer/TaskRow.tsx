@@ -207,7 +207,8 @@ export default function TaskRow({
               className={`font-mono text-[11px] transition-colors ${showDetails ? 'text-brass' : 'text-text3 hover:text-text2'}`}
               title="task brief, steps & discussion"
             >
-              {task.planApproved ? 'steps' : 'details'} {showDetails ? '▴' : '▾'}
+              {task.planApproved ? 'steps' : 'details'}{' '}
+              <span className={`inline-block transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`} aria-hidden>▾</span>
             </button>
           )}
           {running && session && (

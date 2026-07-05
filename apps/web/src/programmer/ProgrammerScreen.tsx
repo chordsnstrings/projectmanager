@@ -219,9 +219,9 @@ export default function ProgrammerScreen({
           <button type="button" onClick={() => onOpenProgress()} className="btn btn-sm btn-ghost" title="your progress & completed work">
             Progress
           </button>
-          <span className="inline-flex items-center gap-1.5 font-mono text-xs text-text2 px-2.5 h-8 rounded-lg border border-hair">
+          <span className="hidden md:inline-flex items-center gap-1.5 font-mono text-xs text-text2 px-2.5 h-8 rounded-lg border border-hair">
             <span className="w-1.5 h-1.5 rounded-full bg-success" aria-hidden />
-            <span className="hidden sm:inline text-text3">github · </span>{login}
+            <span className="text-text3">github · </span>{login}
           </span>
           <button
             type="button"

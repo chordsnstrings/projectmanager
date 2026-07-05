@@ -94,7 +94,9 @@ function PoolRow({ task, onClaim }: { task: TaskDTO; onClaim: (taskId: string) =
           aria-expanded={open}
         >
           <div className="text-sm text-text truncate tracking-tightish">
-            {hasDetails && <span className="text-text3 font-mono text-[10px] mr-1.5">{open ? '▾' : '▸'}</span>}
+            {hasDetails && (
+              <span className={`inline-block text-text3 font-mono text-[10px] mr-1.5 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+            )}
             {task.title}
           </div>
           <div className="font-mono text-[10px] text-text3">unassigned</div>

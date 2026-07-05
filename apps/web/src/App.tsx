@@ -35,6 +35,7 @@ import CheckinModal from './CheckinModal';
 import GuideModal, { GuideButton } from './GuideModal';
 import Walkthrough from './Walkthrough';
 import Toasts, { toast } from './components/Toasts';
+import BoardSkeleton, { ListSkeleton } from './components/Skeleton';
 import ConfirmDialogHost, { confirmDialog } from './components/ConfirmDialog';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import TeamOverview from './admin/TeamOverview';
@@ -476,7 +477,12 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     [refresh],
   );
 
-  if (!loaded) return <Splash>loading your board…</Splash>;
+  if (!loaded)
+    return (
+      <Shell>
+        <BoardSkeleton />
+      </Shell>
+    );
 
   // Self-review screens: "My day" timeline + "Progress".
   if (view === 'day' || view === 'progress') {
@@ -1007,10 +1013,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
               teamDay ? (
                 <TeamDay data={teamDay} onSelectUser={selectUser} />
               ) : (
-                <Loading>loading team day…</Loading>
+                <ListSkeleton rows={5} />
               )
             ) : !loaded ? (
-              <Loading>loading team…</Loading>
+              <ListSkeleton rows={5} />
             ) : team ? (
               <TeamOverview data={team} onSelectUser={selectUser} />
             ) : (

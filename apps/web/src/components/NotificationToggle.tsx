@@ -46,8 +46,8 @@ export default function NotificationToggle({ compact = false }: { compact?: bool
       className={`btn btn-sm ${on ? 'btn-ghost text-success' : 'btn-ghost'}`}
       title={on ? 'Turn off push notifications on this device' : 'Get notified about questions, flags and your tasks'}
     >
-      <span aria-hidden className="mr-1.5">{on ? '🔔' : '🔕'}</span>
-      {busy ? '…' : on ? 'Notifications on' : 'Enable notifications'}
+      <span aria-hidden className="sm:mr-1.5">{on ? '🔔' : '🔕'}</span>
+      <span className="hidden sm:inline">{busy ? '…' : on ? 'Notifications on' : 'Enable notifications'}</span>
     </button>
   );
 }
