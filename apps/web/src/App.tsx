@@ -22,6 +22,7 @@ import type {
   PulseInsights,
 } from '@cadence/shared';
 import { activityKeysFor } from './lib/activity';
+import { usePoll } from './lib/usePoll';
 import { api, ApiError } from './lib/api';
 import { relativeTime } from './lib/format';
 import { downloadTeamCsv } from './lib/csv';
@@ -316,9 +317,8 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   useEffect(() => {
     void doSync();
-    const id = setInterval(refresh, 15000); // near-live for questions
-    return () => clearInterval(id);
-  }, [doSync, refresh]);
+  }, [doSync]);
+  usePoll(refresh, 15000); // near-live for questions; pauses while tab hidden
 
   // "My day": the dev's own timeline (live today, or any past day) for self-review.
   const loadDay = useCallback(
@@ -328,10 +328,8 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   useEffect(() => {
     if (view !== 'day') return;
     void loadDay();
-    if (dayDate !== todayStr()) return;
-    const id = setInterval(loadDay, 30000); // keep today's view current
-    return () => clearInterval(id);
-  }, [view, loadDay, dayDate]);
+  }, [view, loadDay]);
+  usePoll(loadDay, 30000, view === 'day' && dayDate === todayStr()); // keep today's view current
 
   useEffect(() => {
     if (view !== 'progress') return;
@@ -349,7 +347,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       if (!cancelled) await refresh();
     };
     void run();
-    const id = setInterval(run, 25000);
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') void run();
+    }, 25000);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -745,18 +745,15 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
   useEffect(() => {
     void loadTeam();
-    if (!isToday) return;
-    const id = setInterval(loadTeam, 30000);
-    return () => clearInterval(id);
-  }, [loadTeam, isToday]);
+  }, [loadTeam]);
+  usePoll(loadTeam, 30000, isToday);
 
+  const teamDayActive = !selectedUser && tab === 'team' && teamView === 'day';
   useEffect(() => {
-    if (selectedUser || tab !== 'team' || teamView !== 'day') return;
+    if (!teamDayActive) return;
     void loadTeamDay();
-    if (!isToday) return;
-    const id = setInterval(loadTeamDay, 30000);
-    return () => clearInterval(id);
-  }, [selectedUser, tab, teamView, loadTeamDay, isToday]);
+  }, [teamDayActive, loadTeamDay]);
+  usePoll(loadTeamDay, 30000, teamDayActive && isToday);
 
   useEffect(() => {
     if (tab === 'flags') void loadFlags();
