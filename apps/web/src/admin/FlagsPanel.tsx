@@ -3,6 +3,9 @@ import type { FlagDTO } from '@cadence/shared';
 import { relativeTime } from '../lib/format';
 
 export interface FlagsPanelProps {
+  /** another page exists server-side */
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   flags: FlagDTO[];
   onResolve: (id: string) => void;
   onDismiss: (id: string) => void;
@@ -164,7 +167,7 @@ function FlagRow({
   );
 }
 
-export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onOpenUser }: FlagsPanelProps) {
+export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onOpenUser, hasMore = false, onLoadMore }: FlagsPanelProps) {
   return (
     <section className="card overflow-hidden animate-fade-in">
       <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
@@ -192,6 +195,15 @@ export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onOpenU
             />
           ))}
         </ul>
+      )}
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => onLoadMore?.()}
+          className="w-full py-3 font-mono text-[11px] text-text3 hover:text-text2 hover:bg-surface/40 transition-colors border-t border-hair"
+        >
+          show more flags ↓
+        </button>
       )}
     </section>
   );

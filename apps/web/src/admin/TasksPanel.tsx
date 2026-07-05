@@ -474,11 +474,15 @@ export default function TasksPanel({
   roster,
   repos,
   onChanged,
+  hasMore = false,
+  onLoadMore,
 }: {
   tasks: ManagedTask[] | null;
   roster: MemberLite[];
   repos: RepoLite[];
   onChanged: () => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const [creating, setCreating] = useState(false);
 
@@ -504,6 +508,17 @@ export default function TasksPanel({
           {tasks.map((t) => (
             <TaskRow key={t.id} task={t} roster={roster} repos={repos} onChanged={onChanged} />
           ))}
+          {hasMore && (
+            <li>
+              <button
+                type="button"
+                onClick={() => onLoadMore?.()}
+                className="w-full py-3 font-mono text-[11px] text-text3 hover:text-text2 hover:bg-surface/40 transition-colors border-t border-hair"
+              >
+                show more tasks ↓
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </section>

@@ -160,7 +160,7 @@ export default function GuideModal({ me }: { me: Me }) {
       aria-modal="true"
     >
       <div
-        className="card w-full max-w-2xl p-6 sm:p-7 flex flex-col gap-4 max-h-[88vh]"
+        className="card w-full max-w-2xl p-6 sm:p-7 flex flex-col gap-4 max-h-[88vh] animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center gap-3">

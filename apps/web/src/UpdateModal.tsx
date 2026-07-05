@@ -28,7 +28,7 @@ export default function UpdateModal({ me, onAck }: { me: Me; onAck: (version: st
       role="dialog"
       aria-modal="true"
     >
-      <div className="card w-full max-w-md p-6 sm:p-7 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+      <div className="card w-full max-w-md p-6 sm:p-7 flex flex-col gap-4 animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <Logo size={24} />
           <div className="min-w-0">

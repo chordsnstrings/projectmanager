@@ -43,6 +43,9 @@ export interface ProgrammerScreenProps {
   /** keyed by task id */
   sessionsByTask: Record<string, TaskSessionState>;
   onStart?: (taskId: string, intent?: string) => void;
+  /** more pages of tasks exist server-side */
+  moreTasks?: boolean;
+  onLoadMoreTasks?: () => void;
   onStop?: (sessionId: string) => void;
   onOverrideActivity?: (sessionId: string, activity: ActivityType) => void;
   onSaveSummary?: (
@@ -177,6 +180,8 @@ export default function ProgrammerScreen({
   tasks,
   sessionsByTask,
   onStart = noop,
+  moreTasks = false,
+  onLoadMoreTasks = noop,
   onStop = noop,
   onOverrideActivity = noop,
   onSaveSummary = noop,
@@ -341,6 +346,15 @@ export default function ProgrammerScreen({
                 />
               );
             })
+          )}
+          {moreTasks && (
+            <button
+              type="button"
+              onClick={() => onLoadMoreTasks()}
+              className="w-full py-3 font-mono text-[11px] text-text3 hover:text-text2 hover:bg-surface/40 transition-colors border-t border-hair"
+            >
+              show more tasks ↓
+            </button>
           )}
         </div>
 

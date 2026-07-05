@@ -212,6 +212,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [productivity, setProductivity] = useState<ProductivityDTO | null>(null);
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [pool, setPool] = useState<TaskDTO[]>([]);
+  const [tasksCursor, setTasksCursor] = useState<string | null>(null);
   const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -219,14 +220,15 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   const refresh = useCallback(async () => {
     const [t, a, n, q, prod, pl] = await Promise.all([
-      api<Paginated<TaskDTO>>('/tasks').then((p) => p.items).catch(() => [] as TaskDTO[]),
+      api<Paginated<TaskDTO>>('/tasks').catch(() => ({ items: [] as TaskDTO[], nextCursor: null })),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
       api<QuestionDTO[]>('/questions?status=open').catch(() => [] as QuestionDTO[]),
       api<ProductivityDTO>('/me/productivity').catch(() => null),
       api<Paginated<TaskDTO>>('/tasks/pool').then((p) => p.items).catch(() => [] as TaskDTO[]),
     ]);
-    setTasks(t);
+    setTasks(t.items);
+    setTasksCursor(t.nextCursor);
     setActive(a);
     setNudges(n);
     setQuestions(q);
@@ -234,6 +236,14 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     setPool(pl);
     setLoaded(true);
   }, []);
+
+  const onLoadMoreTasks = useCallback(async () => {
+    if (!tasksCursor) return;
+    const p = await api<Paginated<TaskDTO>>(`/tasks?cursor=${tasksCursor}`).catch(() => null);
+    if (!p) return;
+    setTasks((prev) => [...prev, ...p.items.filter((t) => !prev.some((x) => x.id === t.id))]);
+    setTasksCursor(p.nextCursor);
+  }, [tasksCursor]);
 
   const onClaim = useCallback(
     async (taskId: string) => {
@@ -528,6 +538,8 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         nudge={nudge}
         tasks={tasks}
         sessionsByTask={sessionsByTask}
+        moreTasks={tasksCursor != null}
+        onLoadMoreTasks={onLoadMoreTasks}
         onStart={onStart}
         onStop={onStop}
         onEditSummary={onEditSummary}
@@ -597,8 +609,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const [trends, setTrends] = useState<TrendsDTO | null>(null);
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [flags, setFlags] = useState<FlagDTO[]>([]);
+  const [flagsCursor, setFlagsCursor] = useState<string | null>(null);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [managedTasks, setManagedTasks] = useState<ManagedTaskDTO[] | null>(null);
+  const [managedCursor, setManagedCursor] = useState<string | null>(null);
   const [pulse, setPulse] = useState<PulseInsights | null>(null);
   const [roster, setRoster] = useState<MemberLiteDTO[]>([]);
   const [repos, setRepos] = useState<RepoLiteDTO[]>([]);
@@ -630,9 +644,22 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   }, [date, teamQS]);
 
   const loadFlags = useCallback(
-    () => api<Paginated<FlagDTO>>('/flags').then((p) => setFlags(p.items)).catch(() => setFlags([])),
+    () =>
+      api<Paginated<FlagDTO>>('/flags')
+        .then((p) => {
+          setFlags(p.items);
+          setFlagsCursor(p.nextCursor);
+        })
+        .catch(() => setFlags([])),
     [],
   );
+  const loadMoreFlags = useCallback(async () => {
+    if (!flagsCursor) return;
+    const p = await api<Paginated<FlagDTO>>(`/flags?cursor=${flagsCursor}`).catch(() => null);
+    if (!p) return;
+    setFlags((prev) => [...prev, ...p.items.filter((f) => !prev.some((x) => x.id === f.id))]);
+    setFlagsCursor(p.nextCursor);
+  }, [flagsCursor]);
   const loadQuestions = useCallback(
     () => api<QuestionDTO[]>('/questions').then(setQuestions).catch(() => setQuestions([])),
     [],
@@ -640,10 +667,23 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const loadManagedTasks = useCallback(
     () =>
       api<Paginated<ManagedTaskDTO>>(`/tasks/managed${teamFilter ? `?team=${teamFilter}` : ''}`)
-        .then((p) => setManagedTasks(p.items))
+        .then((p) => {
+          setManagedTasks(p.items);
+          setManagedCursor(p.nextCursor);
+        })
         .catch(() => setManagedTasks([])),
     [teamFilter],
   );
+  const loadMoreManaged = useCallback(async () => {
+    if (!managedCursor) return;
+    const qs = new URLSearchParams();
+    if (teamFilter) qs.set('team', teamFilter);
+    qs.set('cursor', managedCursor);
+    const p = await api<Paginated<ManagedTaskDTO>>(`/tasks/managed?${qs.toString()}`).catch(() => null);
+    if (!p) return;
+    setManagedTasks((prev) => [...(prev ?? []), ...p.items.filter((t) => !(prev ?? []).some((x) => x.id === t.id))]);
+    setManagedCursor(p.nextCursor);
+  }, [managedCursor, teamFilter]);
 
   const loadPulse = useCallback(
     () =>
@@ -837,7 +877,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
       <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
         {tab === 'flags' ? (
-          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onOpenUser={openUserDay} />
+          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onOpenUser={openUserDay} hasMore={flagsCursor != null} onLoadMore={loadMoreFlags} />
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
         ) : tab === 'pulse' ? (
@@ -848,6 +888,8 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
             roster={roster}
             repos={repos}
             onChanged={loadManagedTasks}
+            hasMore={managedCursor != null}
+            onLoadMore={loadMoreManaged}
           />
         ) : selectedUser ? (
           <div className="animate-fade-in">
