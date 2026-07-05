@@ -65,6 +65,7 @@ export default function TaskDiscussion({ taskId }: { taskId: string }) {
       <div className="flex items-center gap-2">
         <input
           value={text}
+          maxLength={4000}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
           placeholder="Add a comment…"

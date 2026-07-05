@@ -776,7 +776,10 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     else void loadDay(selectedUser);
   }, [selectedUser, personView, date, loadDay, loadTrends, loadProgress]);
 
-  const selectUser = useCallback((userId: string) => navigate(`/admin/u/${userId}/day`), [navigate]);
+  const selectUser = useCallback(
+    (userId: string) => navigate(`/admin/u/${userId}/day${date !== todayStr() ? `?date=${date}` : ''}`),
+    [navigate, date],
+  );
   // Jump to a person's day timeline, on the day of the given item when provided.
   const openUserDay = useCallback(
     (userId: string, iso?: string | null) => {
@@ -841,7 +844,13 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
   const openCount = day ? day.lanes.flatMap((l) => l.sessions).filter((s) => s.isOpen).length : 0;
 
-  const backToTeam = () => navigate('/admin/team');
+  const backToTeam = () => {
+    const qs = new URLSearchParams();
+    if (date !== todayStr()) qs.set('date', date);
+    if (teamFilter) qs.set('team', teamFilter);
+    const q = qs.toString();
+    navigate(`/admin/team${q ? `?${q}` : ''}`);
+  };
 
   const tabBtn = (t: AdminTab, label: string) => (
     <button

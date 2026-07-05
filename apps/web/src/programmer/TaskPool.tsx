@@ -100,8 +100,8 @@ function PoolRow({ task, onClaim }: { task: TaskDTO; onClaim: (taskId: string) =
       <div className="flex items-center gap-3 px-4 py-2.5">
         <button
           onClick={() => hasDetails && setOpen((v) => !v)}
-          className="min-w-0 flex-1 text-left"
-          aria-expanded={open}
+          className={`min-w-0 flex-1 text-left ${hasDetails ? '' : 'cursor-default'}`}
+          aria-expanded={hasDetails ? open : undefined}
         >
           <div className="text-sm text-text truncate tracking-tightish">
             {hasDetails && (

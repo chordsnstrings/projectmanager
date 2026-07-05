@@ -163,7 +163,7 @@ function CheckinForm({ prompt, onClose }: { prompt: CheckinPrompt; onClose: () =
                         key={c.key}
                         data-on={carry[t.id] === c.key}
                         onClick={() => setCarry((p) => ({ ...p, [t.id]: c.key }))}
-                        className={`px-2 py-1 rounded-md border border-border text-[11px] font-mono text-text3 transition-colors hover:text-text2 ${c.cls}`}
+                        className={`px-2 py-1 rounded-md border border-border text-[11px] font-mono text-text3 transition-all active:scale-95 hover:text-text2 ${c.cls}`}
                       >
                         {c.label}
                       </button>
@@ -278,7 +278,7 @@ function Rating({
           <button
             key={n}
             onClick={() => onChange(n)}
-            className={`flex-1 h-9 rounded-lg border font-mono text-[13px] transition-colors ${
+            className={`flex-1 h-9 rounded-lg border font-mono text-[13px] transition-all active:scale-95 ${
               value === n
                 ? 'border-brass/60 bg-brass/15 text-brass'
                 : 'border-border text-text3 hover:text-text2 hover:border-border2'
