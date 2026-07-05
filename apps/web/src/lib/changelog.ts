@@ -10,6 +10,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8',
+    date: '2026-07-05',
+    title: 'A smoother Cadence',
+    items: [
+      'Long lists load in pages everywhere — "show more" on tasks and flags instead of silently cutting off at 50.',
+      'Clear feedback on every action: error toasts when something fails, and busy states on play/stop, pick up, save and answer.',
+      'Nicer dialogs replace browser popups; Escape closes overlays and the page behind no longer scrolls.',
+      'Faster feel: skeleton loading screens, instant data refresh when you return to the tab, and scroll-to-top on navigation.',
+      'Keyboard: ←/→ steps through days on timeline views; Enter saves your wrap-up summary.',
+      'Mobile: tidier top bar, Pulse table scrolls sideways, press feedback on chips — and admin drill-downs keep your date and team filter.',
+    ],
+  },
+  {
     version: '1.7',
     date: '2026-07-02',
     title: 'A guided walkthrough',
