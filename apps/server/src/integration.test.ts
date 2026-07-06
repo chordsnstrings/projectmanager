@@ -706,6 +706,51 @@ describe('authed API integration', () => {
     await prisma.dailyCheckin.deleteMany({ where: { userId: devId } });
   });
 
+  it('questions attach to an off-task session (no task) and carry its label', async () => {
+    if (!available) return;
+    // dev runs an off-task "study" session — no task anywhere in sight
+    const s = await app.inject({
+      method: 'POST',
+      url: '/sessions',
+      headers: { cookie: devCookie },
+      payload: { offTaskLabel: 'study', intent: 'reading up' },
+    });
+    expect(s.statusCode).toBe(201);
+    const sessionId = s.json().id;
+
+    // no anchor at all → 400
+    expect(
+      (await app.inject({ method: 'POST', url: '/questions', headers: { cookie: adminCookie }, payload: { targetUserId: devId, body: 'about what?' } })).statusCode,
+    ).toBe(400);
+
+    // session-only question → created, labelled with the off-task label
+    const q = await app.inject({
+      method: 'POST',
+      url: '/questions',
+      headers: { cookie: adminCookie },
+      payload: { targetUserId: devId, sessionId, body: 'what are you studying?', blocksNext: false },
+    });
+    expect(q.statusCode).toBe(201);
+    expect(q.json().taskId).toBeNull();
+    expect(q.json().taskTitle).toBe('study');
+    expect(q.json().taskOrigin).toBe('session');
+
+    // the dev sees and answers it
+    const mine = await app.inject({ method: 'GET', url: '/questions?status=open', headers: { cookie: devCookie } });
+    expect(mine.json().some((x: { id: string }) => x.id === q.json().id)).toBe(true);
+    const ans = await app.inject({
+      method: 'POST',
+      url: `/questions/${q.json().id}/answer`,
+      headers: { cookie: devCookie },
+      payload: { answer: 'perf profiling' },
+    });
+    expect(ans.statusCode).toBe(200);
+    expect(ans.json().status).toBe('answered');
+
+    await prisma.question.deleteMany({ where: { sessionId } });
+    await prisma.session.deleteMany({ where: { id: sessionId } });
+  });
+
   it('walkthrough: tourSeen starts false and flips after /me/tour-seen', async () => {
     if (!available) return;
     const me0 = await app.inject({ method: 'GET', url: '/me', headers: { cookie: devCookie } });

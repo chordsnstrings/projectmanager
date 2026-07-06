@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.1',
+    date: '2026-07-06',
+    title: 'Ask about any session',
+    items: [
+      'Managers can now raise a question on any session — including off-task work (study, review, pairing) that has no task. Click the session bar, then "ask…".',
+    ],
+  },
+  {
     version: '1.8',
     date: '2026-07-05',
     title: 'A smoother Cadence',

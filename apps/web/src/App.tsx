@@ -805,10 +805,11 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   );
   const onAsk = useCallback(
     (flag: FlagDTO, body: string) => {
-      if (!flag.taskId || !body.trim()) return;
+      // A question needs a task OR a session to hang on (off-task flags have no task).
+      if (!body.trim() || (!flag.taskId && !flag.sessionId)) return;
       void api('/questions', {
         method: 'POST',
-        body: JSON.stringify({ targetUserId: flag.userId, taskId: flag.taskId, sessionId: flag.sessionId, body: body.trim() }),
+        body: JSON.stringify({ targetUserId: flag.userId, taskId: flag.taskId ?? null, sessionId: flag.sessionId, body: body.trim() }),
       }).then(() => {
         void loadQuestions();
         void loadFlags();
@@ -818,7 +819,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   );
 
   const onAskQuestion = useCallback(
-    (args: { targetUserId: string; taskId: string; sessionId: string; body: string }) => {
+    (args: { targetUserId: string; taskId: string | null; sessionId: string; body: string }) => {
       void api('/questions', { method: 'POST', body: JSON.stringify(args) })
         .then(() => {
           void loadQuestions();

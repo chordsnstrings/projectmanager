@@ -59,7 +59,7 @@ export default function SessionDetail({
               type="button"
               onClick={() => setAsking((a) => !a)}
               disabled={!canAsk}
-              title={canAsk ? 'raise a question on this session' : 'off-task sessions have no task to ask about'}
+              title="raise a question on this session"
               className="btn btn-sm border-brass/40 text-brass hover:bg-brass/10 disabled:hover:bg-transparent"
             >
               ask…

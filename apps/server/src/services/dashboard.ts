@@ -228,7 +228,7 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
   // Task context for labelling each flag/question with what it's about.
   const ctxTaskIds = [
     ...new Set([
-      ...dayQuestions.map((q) => q.taskId),
+      ...(dayQuestions.map((q) => q.taskId).filter(Boolean) as string[]),
       ...(dayFlags.map((f) => f.taskId).filter(Boolean) as string[]),
     ]),
   ];
@@ -360,7 +360,7 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
       };
     }),
     questions: dayQuestions.map((q) => {
-      const t = qTaskById.get(q.taskId);
+      const t = q.taskId ? qTaskById.get(q.taskId) : null;
       return {
         id: q.id,
         adminUserId: q.adminUserId,

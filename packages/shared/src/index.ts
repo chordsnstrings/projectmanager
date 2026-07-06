@@ -280,7 +280,7 @@ export interface QuestionDTO {
   targetUserId: string;
   /** who must answer (so an admin all-team queue can tell people apart) */
   targetLogin: string | null;
-  taskId: string;
+  taskId: string | null; // null → the question is about a session (off-task work)
   /** task context so the recipient knows what the question is about */
   taskTitle: string | null;
   taskOrigin: string | null; // "#142", "PR #88", branch, or "task"
@@ -296,7 +296,8 @@ export interface QuestionDTO {
 
 export interface RaiseQuestionBody {
   targetUserId: string;
-  taskId: string;
+  /** optional when sessionId is given (off-task work has no task) */
+  taskId?: string | null;
   sessionId?: string;
   body: string;
   blocksNext?: boolean;

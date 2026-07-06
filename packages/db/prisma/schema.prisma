@@ -319,7 +319,7 @@ model Question {
   adminUserId  String
   targetUserId String
   targetUser   User           @relation("QuestionTarget", fields: [targetUserId], references: [id])
-  taskId       String
+  taskId       String? // null → the question is about a session (e.g. off-task work)
   sessionId    String?
   body         String
   blocksNext   Boolean        @default(true) // gates the dev's next task completion

@@ -7,7 +7,7 @@ import SessionDetail from './SessionDetail';
 
 export interface DayTimelineProps {
   data: DayTimelineDTO;
-  onAskQuestion?: (args: { targetUserId: string; taskId: string; sessionId: string; body: string }) => void;
+  onAskQuestion?: (args: { targetUserId: string; taskId: string | null; sessionId: string; body: string }) => void;
 }
 
 function HeaderCard({
@@ -184,19 +184,17 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
           session={selected}
           laneTitle={selectedLaneTitle}
           tz={tz}
-          autoAsk={autoAsk && Boolean(selectedTaskId)}
+          autoAsk={autoAsk}
           onClose={() => {
             setSelected(null);
             setAutoAsk(false);
           }}
           questions={data.questions.filter((q) => q.sessionId === selected.id)}
-          canAsk={Boolean(selectedTaskId)}
+          canAsk
           onAsk={
             onAskQuestion
-              ? (body) => {
-                  if (selectedTaskId)
-                    onAskQuestion({ targetUserId: data.userId, taskId: selectedTaskId, sessionId: selected.id, body });
-                }
+              ? (body) =>
+                  onAskQuestion({ targetUserId: data.userId, taskId: selectedTaskId ?? null, sessionId: selected.id, body })
               : undefined
           }
         />

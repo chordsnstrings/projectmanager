@@ -24,11 +24,19 @@ type TaskCtx = {
 };
 
 /** Load task context for a set of questions, keyed by taskId. */
-async function loadTaskCtx(taskIds: string[]): Promise<Map<string, TaskCtx>> {
-  const ids = [...new Set(taskIds)];
+async function loadTaskCtx(taskIds: (string | null)[]): Promise<Map<string, TaskCtx>> {
+  const ids = [...new Set(taskIds.filter((id): id is string => !!id))];
   if (ids.length === 0) return new Map();
   const tasks = await prisma.task.findMany({ where: { id: { in: ids } }, select: { id: true, ...taskCtxSelect } });
   return new Map(tasks.map((t) => [t.id, t]));
+}
+
+/** Off-task label per session id — context for questions that have no task. */
+async function loadSessionLabels(sessionIds: (string | null)[]): Promise<Map<string, string>> {
+  const ids = [...new Set(sessionIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return new Map();
+  const sessions = await prisma.session.findMany({ where: { id: { in: ids } }, select: { id: true, offTaskLabel: true } });
+  return new Map(sessions.map((s) => [s.id, s.offTaskLabel ?? 'session']));
 }
 
 /** GitHub login per user id (for the "who must answer" chip). */
@@ -44,7 +52,7 @@ function toDTO(
     id: string;
     adminUserId: string;
     targetUserId: string;
-    taskId: string;
+    taskId: string | null;
     sessionId: string | null;
     body: string;
     blocksNext: boolean;
@@ -55,6 +63,7 @@ function toDTO(
   },
   task?: TaskCtx | null,
   targetLogin?: string | null,
+  sessionLabel?: string | null,
 ): QuestionDTO {
   return {
     id: q.id,
@@ -62,8 +71,8 @@ function toDTO(
     targetUserId: q.targetUserId,
     targetLogin: targetLogin ?? null,
     taskId: q.taskId,
-    taskTitle: task ? taskDisplayTitle(task) : null,
-    taskOrigin: task ? taskOrigin(task) : null,
+    taskTitle: task ? taskDisplayTitle(task) : sessionLabel ?? null,
+    taskOrigin: task ? taskOrigin(task) : sessionLabel ? 'session' : null,
     repoFullName: task?.repo?.fullName ?? null,
     sessionId: q.sessionId,
     body: q.body,
@@ -82,15 +91,17 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
     const mgr = await requireManager(req, reply);
     if (!mgr) return;
     const { targetUserId, taskId, sessionId, body, blocksNext } = req.body ?? ({} as RaiseQuestionBody);
-    if (!targetUserId || !taskId || !body) {
-      return reply.code(400).send({ error: 'targetUserId_taskId_body_required' });
+    // A question needs the person + the text, and at least one anchor: a task
+    // or a session (off-task work has no task, but is still askable).
+    if (!targetUserId || !body || (!taskId && !sessionId)) {
+      return reply.code(400).send({ error: 'targetUserId_body_and_task_or_session_required' });
     }
     if (!(await assertCanViewUser(mgr, targetUserId, reply))) return;
     const q = await prisma.question.create({
       data: {
         adminUserId: mgr.id,
         targetUserId,
-        taskId,
+        taskId: taskId ?? null,
         sessionId: sessionId ?? null,
         body,
         blocksNext: blocksNext ?? true,
@@ -107,7 +118,12 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       tag: `question-${q.id}`,
     });
     return reply.code(201).send(
-      toDTO(q, (await loadTaskCtx([q.taskId])).get(q.taskId), (await loadLogins([q.targetUserId])).get(q.targetUserId)),
+      toDTO(
+        q,
+        q.taskId ? (await loadTaskCtx([q.taskId])).get(q.taskId) : null,
+        (await loadLogins([q.targetUserId])).get(q.targetUserId),
+        q.sessionId ? (await loadSessionLabels([q.sessionId])).get(q.sessionId) : null,
+      ),
     );
   });
 
@@ -129,8 +145,9 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       req.log.info({ audit: 'question.answered', questionId: q.id, by: user.id }, 'audit');
       return toDTO(
         updated,
-        (await loadTaskCtx([updated.taskId])).get(updated.taskId),
+        updated.taskId ? (await loadTaskCtx([updated.taskId])).get(updated.taskId) : null,
         (await loadLogins([updated.targetUserId])).get(updated.targetUserId),
+        updated.sessionId ? (await loadSessionLabels([updated.sessionId])).get(updated.sessionId) : null,
       );
     },
   );
@@ -154,10 +171,18 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    const [ctx, logins] = await Promise.all([
+    const [ctx, logins, sessionLabels] = await Promise.all([
       loadTaskCtx(rows.map((r) => r.taskId)),
       loadLogins(rows.map((r) => r.targetUserId)),
+      loadSessionLabels(rows.filter((r) => !r.taskId).map((r) => r.sessionId)),
     ]);
-    return rows.map((q) => toDTO(q, ctx.get(q.taskId), logins.get(q.targetUserId)));
+    return rows.map((q) =>
+      toDTO(
+        q,
+        q.taskId ? ctx.get(q.taskId) : null,
+        logins.get(q.targetUserId),
+        q.sessionId ? sessionLabels.get(q.sessionId) : null,
+      ),
+    );
   });
 }

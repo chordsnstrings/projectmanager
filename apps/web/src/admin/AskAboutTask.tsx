@@ -90,7 +90,7 @@ export default function AskAboutTask({
           onChange={(e) => setTaskId(e.target.value)}
           className="field font-mono text-xs px-2.5 h-9 w-full min-w-0 [color-scheme:dark]"
         >
-          {sorted.length === 0 && <option value="">no tasks found</option>}
+          {sorted.length === 0 && <option value="">no tasks found — click a session bar below to ask about it</option>}
           {sorted.map((t) => (
             <option key={t.id} value={t.id}>
               {t.title} · {STATUS_LABEL[t.status] ?? t.status}
