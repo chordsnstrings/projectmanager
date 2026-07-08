@@ -233,6 +233,35 @@ export interface MeetingMinutesDTO {
 /** Request body for POST /sessions/:id/meeting-minutes (also stops the session). */
 export type MeetingMinutesBody = MeetingMinutesDTO;
 
+// ── Scheduled meetings ──────────────────────────────────────────────────────
+export interface MeetingAttendeeDTO {
+  userId: string;
+  githubLogin: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+export interface MeetingDTO {
+  id: string;
+  title: string;
+  agenda: string | null;
+  location: string | null;
+  scheduledAt: string; // ISO UTC
+  durationMinutes: number;
+  teamId: string | null;
+  createdByUserId: string;
+  createdByLogin: string | null;
+  canceled: boolean;
+  attendees: MeetingAttendeeDTO[];
+}
+export interface CreateMeetingBody {
+  title: string;
+  scheduledAt: string; // ISO — must be in the future
+  durationMinutes?: number;
+  agenda?: string | null;
+  location?: string | null;
+  attendeeIds: string[];
+}
+
 export interface StartSessionBody {
   taskId?: string;
   offTaskLabel?: string;

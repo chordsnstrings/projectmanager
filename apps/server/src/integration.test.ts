@@ -48,6 +48,8 @@ afterAll(async () => {
   await prisma.question.deleteMany({ where: { targetUserId: devId } });
   await prisma.dailyCheckin.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.pushSubscription.deleteMany({ where: { userId: { in: [adminId, devId] } } });
+  await prisma.meetingAttendee.deleteMany({ where: { userId: { in: [adminId, devId] } } });
+  await prisma.meeting.deleteMany({ where: { createdByUserId: { in: [adminId, devId] } } });
   const mms = await prisma.meetingMinutes.findMany({ where: { session: { userId: { in: [adminId, devId] } } }, select: { id: true } });
   if (mms.length) {
     await prisma.meetingMinutesItem.deleteMany({ where: { minutesId: { in: mms.map((m: { id: string }) => m.id) } } });
@@ -709,6 +711,48 @@ describe('authed API integration', () => {
     expect((await app.inject({ method: 'GET', url: '/dashboard/checkins', headers: { cookie: devCookie } })).statusCode).toBe(403);
 
     await prisma.dailyCheckin.deleteMany({ where: { userId: devId } });
+  });
+
+  it('admins schedule meetings for specific people at a future time', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    await prisma.user.updateMany({ where: { id: { in: [adminId, devId] } }, data: { teamId: prog.id } });
+    const future = new Date(Date.now() + 3 * 3600_000).toISOString();
+
+    // a member cannot schedule
+    expect(
+      (await app.inject({ method: 'POST', url: '/meetings', headers: { cookie: devCookie }, payload: { title: 'x', scheduledAt: future, attendeeIds: [devId] } })).statusCode,
+    ).toBe(403);
+
+    // past time is rejected
+    expect(
+      (await app.inject({ method: 'POST', url: '/meetings', headers: { cookie: adminCookie }, payload: { title: 'x', scheduledAt: new Date(Date.now() - 1000).toISOString(), attendeeIds: [devId] } })).statusCode,
+    ).toBe(400);
+
+    // admin schedules with an attendee
+    const mk = await app.inject({
+      method: 'POST',
+      url: '/meetings',
+      headers: { cookie: adminCookie },
+      payload: { title: 'Growth review', scheduledAt: future, durationMinutes: 45, agenda: 'plan', location: 'Room 1', attendeeIds: [devId] },
+    });
+    expect(mk.statusCode).toBe(201);
+    const mid = mk.json().id;
+    expect(mk.json().attendees.map((a: { userId: string }) => a.userId)).toContain(devId);
+
+    // the attendee sees it on their own upcoming list
+    const mine = await app.inject({ method: 'GET', url: '/me/meetings', headers: { cookie: devCookie } });
+    expect(mine.json().some((m: { id: string }) => m.id === mid)).toBe(true);
+
+    // the organizer can cancel; then it drops off the manager list
+    expect((await app.inject({ method: 'DELETE', url: `/meetings/${mid}`, headers: { cookie: adminCookie } })).statusCode).toBe(200);
+    const list = await app.inject({ method: 'GET', url: '/meetings', headers: { cookie: adminCookie } });
+    expect(list.json().items.some((m: { id: string }) => m.id === mid)).toBe(false);
+
+    await prisma.meetingAttendee.deleteMany({ where: { meetingId: mid } });
+    await prisma.meeting.deleteMany({ where: { id: mid } });
   });
 
   it('meeting sessions require minutes before they can stop', async () => {

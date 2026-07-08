@@ -10,6 +10,7 @@ const ASSETS = `${VERSION}-assets`;
 const API_PREFIXES = [
   '/healthz', '/me', '/api', '/auth', '/webhooks', '/tasks', '/sessions',
   '/dashboard', '/flags', '/questions', '/nudges', '/completions', '/push',
+  '/meetings', '/meeting-items',
 ];
 
 self.addEventListener('install', (event) => {

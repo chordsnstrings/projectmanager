@@ -87,6 +87,10 @@ jobs:
     instance_size_slug: apps-s-1vcpu-0.5gb
     envs:
       - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
+      # Web Push for meeting reminders (dormant until the VAPID keys are set).
+      - { key: VAPID_PUBLIC_KEY, scope: RUN_TIME }
+      - { key: VAPID_PRIVATE_KEY, scope: RUN_TIME, type: SECRET }
+      - { key: VAPID_SUBJECT, scope: RUN_TIME, value: "mailto:chordsnstrings@users.noreply.github.com" }
   - name: digest
     kind: SCHEDULED
     schedule:

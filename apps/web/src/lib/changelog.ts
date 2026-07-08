@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0',
+    date: '2026-07-08',
+    title: 'Schedule meetings',
+    items: [
+      'Managers can schedule a meeting for specific people at a future time (with agenda, duration and a room/link) from the new Meetings tab.',
+      'Invitees see it on their board with a countdown, get notified, and can start it in one tap when it’s time — which flows straight into the minutes form.',
+    ],
+  },
+  {
     version: '1.9',
     date: '2026-07-08',
     title: 'Meeting minutes → action items',

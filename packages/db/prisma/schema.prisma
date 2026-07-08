@@ -23,6 +23,7 @@ model Team {
   deletedAt DateTime?
   users     User[]
   tasks     Task[]
+  meetings  Meeting[]
 }
 
 enum TaskSource {
@@ -95,6 +96,8 @@ model User {
   taskComments TaskComment[]
   dailyCheckins DailyCheckin[]
   pushSubscriptions PushSubscription[]
+  meetingsCreated Meeting[]  @relation("MeetingCreator")
+  meetingAttendance MeetingAttendee[]
   flags       Flag[]
   questions   Question[]  @relation("QuestionTarget")
   createdAt   DateTime    @default(now())
@@ -213,6 +216,38 @@ model PushSubscription {
   createdAt DateTime  @default(now())
   deletedAt DateTime? // soft-deleted when the push service reports it's gone (404/410)
 
+  @@index([userId])
+}
+
+// A meeting scheduled by a manager for specific people at a future time.
+model Meeting {
+  id              String    @id @default(cuid())
+  title           String
+  agenda          String?
+  location        String? // room or video link
+  scheduledAt     DateTime // UTC start time
+  durationMinutes Int       @default(30)
+  teamId          String? // organizing team (creator's team) — scopes lead management
+  team            Team?     @relation(fields: [teamId], references: [id])
+  createdByUserId String
+  createdBy       User      @relation("MeetingCreator", fields: [createdByUserId], references: [id])
+  canceledAt      DateTime?
+  reminderSentAt  DateTime? // dedupes the pre-start reminder push
+  createdAt       DateTime  @default(now())
+  attendees       MeetingAttendee[]
+
+  @@index([scheduledAt])
+  @@index([teamId, scheduledAt])
+}
+
+model MeetingAttendee {
+  id        String  @id @default(cuid())
+  meetingId String
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([meetingId, userId])
   @@index([userId])
 }
 

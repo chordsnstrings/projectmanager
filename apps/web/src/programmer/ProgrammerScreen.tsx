@@ -19,8 +19,9 @@ import { liveElapsed } from '../lib/format';
 import QuestionsForDev from './QuestionsForDev';
 import TaskPool from './TaskPool';
 import AddActivity from './AddActivity';
+import UpcomingMeetings from './UpcomingMeetings';
 import MeetingMinutesModal from './MeetingMinutesModal';
-import type { MeetingMinutesBody } from '@cadence/shared';
+import type { MeetingMinutesBody, MeetingDTO } from '@cadence/shared';
 
 /** Per-task UI state bundle resolved by the parent (no fetching here). */
 export interface TaskSessionState {
@@ -72,6 +73,9 @@ export interface ProgrammerScreenProps {
   onStopOffTask?: (sessionId: string) => void | Promise<void>;
   /** record a meeting's minutes and stop it (required for `meeting` sessions) */
   onStopMeeting?: (sessionId: string, minutes: MeetingMinutesBody) => Promise<void>;
+  /** the caller's upcoming scheduled meetings */
+  meetings?: MeetingDTO[];
+  onStartMeeting?: (title: string) => void;
   /** open questions the dev must answer (gates next completion) */
   questions?: QuestionDTO[];
   onAnswerQuestion?: (id: string, answer: string) => void;
@@ -267,6 +271,8 @@ export default function ProgrammerScreen({
   offTaskRunning = [],
   onStopOffTask = noop,
   onStopMeeting = async () => {},
+  meetings = [],
+  onStartMeeting = noop,
   questions = [],
   onAnswerQuestion = noop,
   onStartLabeled = noop,
@@ -338,6 +344,9 @@ export default function ProgrammerScreen({
 
         {/* Open questions the dev must answer (gates next completion) */}
         <QuestionsForDev questions={questions} onAnswer={onAnswerQuestion} />
+
+        {/* Scheduled meetings the caller is part of */}
+        <UpcomingMeetings meetings={meetings} onStartMeeting={onStartMeeting} />
 
         {/* Team task pool — claim work or add your own */}
         <TaskPool pool={pool} onClaim={onClaim} onCreateTask={onCreateTask} />

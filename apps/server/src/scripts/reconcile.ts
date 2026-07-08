@@ -12,6 +12,7 @@ import {
   generateInferredSegments,
   reconcileFlags,
 } from '../engine/reconcileFlags';
+import { remindUpcomingMeetings } from '../services/meetings';
 
 async function main(): Promise<void> {
   const startedAt = Date.now();
@@ -19,6 +20,7 @@ async function main(): Promise<void> {
   const stopped = await autoStopOnCommit(prisma);
   const segments = await generateInferredSegments(prisma);
   const result = await reconcileFlags(prisma);
+  const meetingReminders = await remindUpcomingMeetings().catch(() => 0);
   console.log(
     JSON.stringify({
       job: 'reconcile',
@@ -26,6 +28,7 @@ async function main(): Promise<void> {
       closedStale,
       autoStopped: stopped,
       segmentsCreated: segments,
+      meetingReminders,
       ms: Date.now() - startedAt,
       at: new Date().toISOString(),
     }),

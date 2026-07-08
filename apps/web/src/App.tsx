@@ -21,6 +21,8 @@ import type {
   TeamDTO as TeamDTOAlias,
   PulseInsights,
   MeetingMinutesBody,
+  MeetingDTO,
+  CreateMeetingBody,
 } from '@cadence/shared';
 import { activityKeysFor } from './lib/activity';
 import { usePoll } from './lib/usePoll';
@@ -53,6 +55,7 @@ import SendDigestButton from './admin/SendDigestButton';
 import RunLoginCheckButton from './admin/RunLoginCheckButton';
 import QuestionsPanel from './admin/QuestionsPanel';
 import PulsePanel from './admin/PulsePanel';
+import MeetingsPanel from './admin/MeetingsPanel';
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
 
@@ -223,19 +226,21 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [pool, setPool] = useState<TaskDTO[]>([]);
   const [tasksCursor, setTasksCursor] = useState<string | null>(null);
+  const [myMeetings, setMyMeetings] = useState<MeetingDTO[]>([]);
   const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, a, n, q, prod, pl] = await Promise.all([
+    const [t, a, n, q, prod, pl, mtg] = await Promise.all([
       api<Paginated<TaskDTO>>('/tasks').catch(() => ({ items: [] as TaskDTO[], nextCursor: null })),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
       api<QuestionDTO[]>('/questions?status=open').catch(() => [] as QuestionDTO[]),
       api<ProductivityDTO>('/me/productivity').catch(() => null),
       api<Paginated<TaskDTO>>('/tasks/pool').then((p) => p.items).catch(() => [] as TaskDTO[]),
+      api<MeetingDTO[]>('/me/meetings').catch(() => [] as MeetingDTO[]),
     ]);
     setTasks(t.items);
     setTasksCursor(t.nextCursor);
@@ -244,6 +249,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     setQuestions(q);
     setProductivity(prod);
     setPool(pl);
+    setMyMeetings(mtg);
     setLoaded(true);
   }, []);
 
@@ -452,6 +458,20 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     [refresh],
   );
 
+  // Start a meeting session for a scheduled meeting — intent = its title, so the
+  // MoM modal (required to stop) opens for this meeting when it ends.
+  const onStartMeeting = useCallback(
+    async (title: string) => {
+      await api<SessionDTO>('/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ offTaskLabel: 'meeting', intent: title.slice(0, 300) }),
+      }).catch(() => toast('Couldn’t start the meeting', 'error'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      await refresh();
+    },
+    [refresh],
+  );
+
   // Record a meeting's minutes and stop it (server does both atomically). Throws
   // on failure so the modal can keep itself open and show an error.
   const onStopMeeting = useCallback(
@@ -606,6 +626,8 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onLoadMoreTasks={onLoadMoreTasks}
         meId={me.id}
         onMarkDone={onMarkDone}
+        meetings={myMeetings}
+        onStartMeeting={onStartMeeting}
         onStart={onStart}
         onStop={onStop}
         onEditSummary={onEditSummary}
@@ -642,7 +664,7 @@ function shiftDate(d: string, delta: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-type AdminTab = 'team' | 'tasks' | 'flags' | 'questions' | 'pulse';
+type AdminTab = 'team' | 'tasks' | 'meetings' | 'flags' | 'questions' | 'pulse';
 
 function AdminApp({ me, route }: { me: Me; route: Route }) {
   const { path, params, navigate } = route;
@@ -659,9 +681,11 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       ? 'questions'
       : path.startsWith('/admin/tasks')
         ? 'tasks'
-        : path.startsWith('/admin/pulse')
-          ? 'pulse'
-          : 'team';
+        : path.startsWith('/admin/meetings')
+          ? 'meetings'
+          : path.startsWith('/admin/pulse')
+            ? 'pulse'
+            : 'team';
   const teamView: 'roster' | 'day' = path.startsWith('/admin/team/day') ? 'day' : 'roster';
   const date = params.get('date') ?? todayStr();
   const isToday = date === todayStr();
@@ -680,6 +704,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [managedTasks, setManagedTasks] = useState<ManagedTaskDTO[] | null>(null);
   const [managedCursor, setManagedCursor] = useState<string | null>(null);
+  const [meetings, setMeetings] = useState<MeetingDTO[] | null>(null);
   const [pulse, setPulse] = useState<PulseInsights | null>(null);
   const [roster, setRoster] = useState<MemberLiteDTO[]>([]);
   const [repos, setRepos] = useState<RepoLiteDTO[]>([]);
@@ -759,6 +784,27 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
         .catch(() => setPulse(null)),
     [teamFilter],
   );
+  const loadMeetings = useCallback(
+    () => api<Paginated<MeetingDTO>>('/meetings').then((p) => setMeetings(p.items)).catch(() => setMeetings([])),
+    [],
+  );
+  const onCreateMeeting = useCallback(
+    async (body: CreateMeetingBody) => {
+      await api('/meetings', { method: 'POST', body: JSON.stringify(body) });
+      toast('Meeting scheduled', 'success');
+      await loadMeetings();
+    },
+    [loadMeetings],
+  );
+  const onCancelMeeting = useCallback(
+    async (id: string) => {
+      await api(`/meetings/${id}`, { method: 'DELETE' })
+        .then(() => toast('Meeting canceled', 'success'))
+        .catch(() => toast('Couldn’t cancel the meeting', 'error'));
+      await loadMeetings();
+    },
+    [loadMeetings],
+  );
 
   const loadDay = useCallback(
     (userId: string) =>
@@ -800,12 +846,16 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     if (tab === 'flags') void loadFlags();
     if (tab === 'questions') void loadQuestions();
     if (tab === 'pulse') void loadPulse();
+    if (tab === 'meetings') {
+      void loadMeetings();
+      void api<MemberLiteDTO[]>(`/users${teamFilter ? `?team=${teamFilter}` : ''}`).then(setRoster).catch(() => {});
+    }
     if (tab === 'tasks') {
       void loadManagedTasks();
       void api<MemberLiteDTO[]>(`/users${teamFilter ? `?team=${teamFilter}` : ''}`).then(setRoster).catch(() => {});
       if (repos.length === 0) void api<RepoLiteDTO[]>('/repos').then(setRepos).catch(() => {});
     }
-  }, [tab, loadFlags, loadQuestions, loadPulse, loadManagedTasks, teamFilter, repos.length]);
+  }, [tab, loadFlags, loadQuestions, loadPulse, loadMeetings, loadManagedTasks, teamFilter, repos.length]);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -946,6 +996,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
       <div className="px-4 sm:px-6 pt-5 max-w-6xl mx-auto w-full flex items-center gap-1.5 flex-wrap">
         {tabBtn('team', 'People')}
         {tabBtn('tasks', 'Tasks')}
+        {tabBtn('meetings', 'Meetings')}
         {tabBtn('pulse', 'Pulse')}
         {tabBtn('flags', 'Flags')}
         {tabBtn('questions', 'Questions')}
@@ -974,6 +1025,8 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
         ) : tab === 'pulse' ? (
           <PulsePanel data={pulse} />
+        ) : tab === 'meetings' ? (
+          <MeetingsPanel meetings={meetings} roster={roster} onCreate={onCreateMeeting} onCancel={onCancelMeeting} />
         ) : tab === 'tasks' ? (
           <TasksPanel
             tasks={managedTasks}
