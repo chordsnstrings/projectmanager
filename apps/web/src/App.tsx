@@ -20,6 +20,7 @@ import type {
   RepoLite as RepoLiteDTO,
   TeamDTO as TeamDTOAlias,
   PulseInsights,
+  MeetingMinutesBody,
 } from '@cadence/shared';
 import { activityKeysFor } from './lib/activity';
 import { usePoll } from './lib/usePoll';
@@ -420,7 +421,20 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   const onStopOffTask = useCallback(
     async (sessionId: string) => {
-      await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' }).catch(() => {});
+      await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' }).catch(() =>
+        toast('Couldn’t stop the session', 'error'),
+      );
+      await refresh();
+    },
+    [refresh],
+  );
+
+  // Record a meeting's minutes and stop it (server does both atomically). Throws
+  // on failure so the modal can keep itself open and show an error.
+  const onStopMeeting = useCallback(
+    async (sessionId: string, minutes: MeetingMinutesBody) => {
+      await api(`/sessions/${sessionId}/meeting-minutes`, { method: 'POST', body: JSON.stringify(minutes) });
+      toast('Meeting minutes saved', 'success');
       await refresh();
     },
     [refresh],
@@ -581,6 +595,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onSignOut={signOut}
         offTaskRunning={active.filter((s) => !s.taskId && s.isOpen)}
         onStopOffTask={onStopOffTask}
+        onStopMeeting={onStopMeeting}
         questions={questions}
         onAnswerQuestion={onAnswerQuestion}
         stopOnCommit={stopOnCommit}
@@ -834,9 +849,16 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
   const endOpenSessions = useCallback(async () => {
     if (!day) return;
     const open = day.lanes.flatMap((l) => l.sessions).filter((s) => s.isOpen);
+    // Meetings can only be ended by their runner (they must file the minutes),
+    // so bulk-stop skips them and tells the admin.
+    const meetings = open.filter((s) => s.offTaskLabel === 'meeting');
+    const stoppable = open.filter((s) => s.offTaskLabel !== 'meeting');
     await Promise.all(
-      open.map((s) => api(`/sessions/${s.id}/stop`, { method: 'POST', body: '{}' }).catch(() => {})),
+      stoppable.map((s) => api(`/sessions/${s.id}/stop`, { method: 'POST', body: '{}' }).catch(() => {})),
     );
+    if (meetings.length > 0) {
+      toast(`${meetings.length} live meeting${meetings.length > 1 ? 's' : ''} left running — only its owner can end it (minutes required)`, 'info');
+    }
     if (selectedUser) await loadDay(selectedUser);
     void loadTeam();
   }, [day, selectedUser, loadDay, loadTeam]);

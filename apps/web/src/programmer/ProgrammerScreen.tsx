@@ -19,6 +19,8 @@ import { liveElapsed } from '../lib/format';
 import QuestionsForDev from './QuestionsForDev';
 import TaskPool from './TaskPool';
 import AddActivity from './AddActivity';
+import MeetingMinutesModal from './MeetingMinutesModal';
+import type { MeetingMinutesBody } from '@cadence/shared';
 
 /** Per-task UI state bundle resolved by the parent (no fetching here). */
 export interface TaskSessionState {
@@ -65,6 +67,8 @@ export interface ProgrammerScreenProps {
   offTaskRunning?: SessionDTO[];
   /** stop a session directly (no wrap-up panel) — used for off-task */
   onStopOffTask?: (sessionId: string) => void | Promise<void>;
+  /** record a meeting's minutes and stop it (required for `meeting` sessions) */
+  onStopMeeting?: (sessionId: string, minutes: MeetingMinutesBody) => Promise<void>;
   /** open questions the dev must answer (gates next completion) */
   questions?: QuestionDTO[];
   onAnswerQuestion?: (id: string, answer: string) => void;
@@ -161,8 +165,34 @@ function NudgeBanner({
   );
 }
 
-function OffTaskRow({ session, onStop }: { session: SessionDTO; onStop: (id: string) => void | Promise<void> }) {
+function OffTaskRow({
+  session,
+  onStop,
+  onStopMeeting,
+}: {
+  session: SessionDTO;
+  onStop: (id: string) => void | Promise<void>;
+  onStopMeeting: (sessionId: string, minutes: MeetingMinutesBody) => Promise<void>;
+}) {
   const [busy, setBusy] = useState(false);
+  const [minutesOpen, setMinutesOpen] = useState(false);
+  const isMeeting = session.offTaskLabel === 'meeting';
+
+  const stop = async () => {
+    if (busy) return;
+    // Meetings can't just stop — capture the minutes first.
+    if (isMeeting) {
+      setMinutesOpen(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onStop(session.id);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-hair last:border-b-0">
       <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 animate-pulse" aria-hidden />
@@ -174,21 +204,23 @@ function OffTaskRow({ session, onStop }: { session: SessionDTO; onStop: (id: str
       <button
         type="button"
         disabled={busy}
-        onClick={async () => {
-          if (busy) return;
-          setBusy(true);
-          try {
-            await onStop(session.id);
-          } finally {
-            setBusy(false);
-          }
-        }}
+        onClick={stop}
         className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-hair2 text-danger hover:bg-danger/10 transition-colors disabled:opacity-60"
-        title="stop session"
+        title={isMeeting ? 'end meeting — record minutes' : 'stop session'}
         aria-label="stop off-task session"
       >
         {busy ? <span className="animate-spin text-xs leading-none" aria-hidden>◌</span> : <span className="text-xs leading-none">■</span>}
       </button>
+      {minutesOpen && (
+        <MeetingMinutesModal
+          session={session}
+          onCancel={() => setMinutesOpen(false)}
+          onSubmit={async (id, minutes) => {
+            await onStopMeeting(id, minutes);
+            setMinutesOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -229,6 +261,7 @@ export default function ProgrammerScreen({
   syncing = false,
   offTaskRunning = [],
   onStopOffTask = noop,
+  onStopMeeting = async () => {},
   questions = [],
   onAnswerQuestion = noop,
   onStartLabeled = noop,
@@ -314,7 +347,7 @@ export default function ProgrammerScreen({
               off-task running · {offTaskRunning.length}
             </div>
             {offTaskRunning.map((s) => (
-              <OffTaskRow key={s.id} session={s} onStop={onStopOffTask} />
+              <OffTaskRow key={s.id} session={s} onStop={onStopOffTask} onStopMeeting={onStopMeeting} />
             ))}
           </div>
         )}

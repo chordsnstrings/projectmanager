@@ -48,6 +48,11 @@ afterAll(async () => {
   await prisma.question.deleteMany({ where: { targetUserId: devId } });
   await prisma.dailyCheckin.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.pushSubscription.deleteMany({ where: { userId: { in: [adminId, devId] } } });
+  const mms = await prisma.meetingMinutes.findMany({ where: { session: { userId: { in: [adminId, devId] } } }, select: { id: true } });
+  if (mms.length) {
+    await prisma.meetingMinutesItem.deleteMany({ where: { minutesId: { in: mms.map((m: { id: string }) => m.id) } } });
+    await prisma.meetingMinutes.deleteMany({ where: { id: { in: mms.map((m: { id: string }) => m.id) } } });
+  }
   await prisma.session.deleteMany({ where: { userId: { in: [adminId, devId] } } });
   await prisma.user.deleteMany({ where: { id: { in: [adminId, devId] } } });
   await app.close();
@@ -704,6 +709,63 @@ describe('authed API integration', () => {
     expect((await app.inject({ method: 'GET', url: '/dashboard/checkins', headers: { cookie: devCookie } })).statusCode).toBe(403);
 
     await prisma.dailyCheckin.deleteMany({ where: { userId: devId } });
+  });
+
+  it('meeting sessions require minutes before they can stop', async () => {
+    if (!available) return;
+    // 201 for a fresh meeting, or 200 if a prior test left one open (dedupe).
+    const start = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: devCookie }, payload: { offTaskLabel: 'meeting' } });
+    expect([200, 201]).toContain(start.statusCode);
+    const sid = start.json().id;
+
+    // plain stop is blocked until minutes are on file
+    const blocked = await app.inject({ method: 'POST', url: `/sessions/${sid}/stop`, headers: { cookie: devCookie }, payload: {} });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error).toBe('meeting_minutes_required');
+
+    // incomplete minutes are rejected (all fields required)
+    const bad = await app.inject({
+      method: 'POST',
+      url: `/sessions/${sid}/meeting-minutes`,
+      headers: { cookie: devCookie },
+      payload: { date: '2026-07-01', attendees: 'mgmt', agenda: 'growth', items: [{ topic: 'x', details: '', decision: 'd', responsible: 'r', timeline: 't', remarks: 'n/a' }] },
+    });
+    expect(bad.statusCode).toBe(422);
+
+    // only the runner may file them
+    expect(
+      (await app.inject({ method: 'POST', url: `/sessions/${sid}/meeting-minutes`, headers: { cookie: adminCookie }, payload: { date: '2026-07-01', attendees: 'm', agenda: 'a', items: [{ topic: 't', details: 'd', decision: 'd', responsible: 'r', timeline: 't', remarks: 'x' }] } })).statusCode,
+    ).toBe(403);
+
+    // a complete MoM saves + stops the session, and comes back on the DTO
+    const ok = await app.inject({
+      method: 'POST',
+      url: `/sessions/${sid}/meeting-minutes`,
+      headers: { cookie: devCookie },
+      payload: {
+        date: '2026-07-01',
+        attendees: 'All management members',
+        agenda: 'Review business + growth',
+        items: [
+          { topic: 'Pricing', details: 'multiple tiers', decision: 'top clients 1.00', responsible: 'Arman', timeline: '1 Jul', remarks: 'n/a' },
+          { topic: 'Reporting', details: 'monthly P&L', decision: 'by 15th', responsible: 'Accounts', timeline: 'monthly', remarks: 'n/a' },
+        ],
+      },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().isOpen).toBe(false);
+    expect(ok.json().meetingMinutes.items.length).toBe(2);
+    expect(ok.json().meetingMinutes.attendees).toBe('All management members');
+
+    // a second filing is refused
+    expect(
+      (await app.inject({ method: 'POST', url: `/sessions/${sid}/meeting-minutes`, headers: { cookie: devCookie }, payload: { date: '2026-07-01', attendees: 'm', agenda: 'a', items: [{ topic: 't', details: 'd', decision: 'd', responsible: 'r', timeline: 't', remarks: 'x' }] } })).statusCode,
+    ).toBe(409);
+
+    const mm = await prisma.meetingMinutes.findUnique({ where: { sessionId: sid } });
+    await prisma.meetingMinutesItem.deleteMany({ where: { minutesId: mm!.id } });
+    await prisma.meetingMinutes.deleteMany({ where: { sessionId: sid } });
+    await prisma.session.deleteMany({ where: { id: sid } });
   });
 
   it('questions attach to an off-task session (no task) and carry its label', async () => {

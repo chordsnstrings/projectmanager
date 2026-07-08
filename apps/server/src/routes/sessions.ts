@@ -3,6 +3,7 @@ import { prisma } from '@cadence/db';
 import type {
   ActivityOverrideBody,
   DraftSummary,
+  MeetingMinutesBody,
   NudgeDTO,
   SessionDTO,
   StartSessionBody,
@@ -113,6 +114,20 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
 
       const { summary, blocked, markTaskDone } = req.body ?? {};
 
+      // Meeting gate: a `meeting` off-task session cannot be stopped until its
+      // Minutes of Meeting are on file. The client stops meetings via
+      // POST /sessions/:id/meeting-minutes (which saves + stops atomically);
+      // this guard blocks any other stop path (incl. admin bulk-stop / API).
+      if (session.offTaskLabel === 'meeting') {
+        const hasMinutes = await prisma.meetingMinutes.findUnique({ where: { sessionId: session.id }, select: { id: true } });
+        if (!hasMinutes) {
+          return reply.code(409).send({
+            error: 'meeting_minutes_required',
+            detail: 'Record the meeting minutes before ending this meeting.',
+          });
+        }
+      }
+
       // Question gate (§6): a dev with an open blocking question cannot complete a task.
       if (markTaskDone && session.taskId) {
         if (await hasOpenBlockingQuestion(prisma, user.id)) {
@@ -141,6 +156,72 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
+      return sessionToDTO(updated);
+    },
+  );
+
+  // ── Meeting minutes: record the MoM AND stop the meeting in one transaction ──
+  // Only the person who ran the meeting may file it (they were there). All fields
+  // are required; the session ends only once a valid MoM is stored.
+  app.post<{ Params: { id: string }; Body: MeetingMinutesBody }>(
+    '/sessions/:id/meeting-minutes',
+    async (req, reply) => {
+      const user = await requireUser(req, reply);
+      if (!user) return;
+      const session = await prisma.session.findFirst({ where: { id: req.params.id, deletedAt: null } });
+      if (!session) return reply.code(404).send({ error: 'session_not_found' });
+      // Whoever ran the meeting fills it — not even an admin fills someone else's.
+      if (session.userId !== user.id) return reply.code(403).send({ error: 'forbidden' });
+      if (session.offTaskLabel !== 'meeting') return reply.code(400).send({ error: 'not_a_meeting' });
+      const existing = await prisma.meetingMinutes.findUnique({ where: { sessionId: session.id }, select: { id: true } });
+      if (existing) return reply.code(409).send({ error: 'minutes_already_recorded' });
+
+      // Validate: every field is required (no blanks anywhere) and ≥1 item.
+      const clean = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+      const date = clean(req.body?.date);
+      const attendees = clean(req.body?.attendees);
+      const agenda = clean(req.body?.agenda);
+      const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+      const items = rawItems.map((it) => ({
+        topic: clean(it?.topic),
+        details: clean(it?.details),
+        decision: clean(it?.decision),
+        responsible: clean(it?.responsible),
+        timeline: clean(it?.timeline),
+        remarks: clean(it?.remarks),
+      }));
+      const itemsValid = items.length > 0 && items.every((it) => Object.values(it).every((v) => v.length > 0));
+      if (!date || !attendees || !agenda || !itemsValid) {
+        return reply.code(422).send({ error: 'incomplete_minutes', detail: 'All meeting-minutes fields are required.' });
+      }
+
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.meetingMinutes.create({
+          data: {
+            sessionId: session.id,
+            date: date.slice(0, 20),
+            attendees: attendees.slice(0, 2000),
+            agenda: agenda.slice(0, 2000),
+            items: {
+              create: items.map((it, i) => ({
+                order: i,
+                topic: it.topic.slice(0, 500),
+                details: it.details.slice(0, 4000),
+                decision: it.decision.slice(0, 4000),
+                responsible: it.responsible.slice(0, 500),
+                timeline: it.timeline.slice(0, 500),
+                remarks: it.remarks.slice(0, 2000),
+              })),
+            },
+          },
+        });
+        return tx.session.update({
+          where: { id: session.id },
+          data: { endedAt: new Date(), isOpen: false },
+          include: { segments: true, meetingMinutes: { include: { items: true } } },
+        });
+      });
+      req.log.info({ audit: 'meeting.minutes', sessionId: session.id, by: user.id, items: items.length }, 'audit');
       return sessionToDTO(updated);
     },
   );

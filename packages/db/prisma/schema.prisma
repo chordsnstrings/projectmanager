@@ -258,10 +258,42 @@ model Session {
   summary      String?
   blocked      Boolean           @default(false)
   segments     ActivitySegment[]
+  meetingMinutes MeetingMinutes?
   createdAt    DateTime          @default(now())
   deletedAt    DateTime?
 
   @@index([userId, startedAt])
+}
+
+// Minutes of a meeting (MoM) — captured before a `meeting` off-task session may
+// be stopped. Hard-required: the session cannot end without minutes on file.
+model MeetingMinutes {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  session   Session  @relation(fields: [sessionId], references: [id])
+  date      String // YYYY-MM-DD meeting date (defaults to the session's start day)
+  attendees String // "Members" present
+  agenda    String
+  createdAt DateTime @default(now())
+  items     MeetingMinutesItem[]
+
+  @@index([sessionId])
+}
+
+// One agenda row of a MoM (topic → decision). All fields required.
+model MeetingMinutesItem {
+  id          String         @id @default(cuid())
+  minutesId   String
+  minutes     MeetingMinutes @relation(fields: [minutesId], references: [id], onDelete: Cascade)
+  order       Int // display order within the MoM
+  topic       String
+  details     String
+  decision    String
+  responsible String
+  timeline    String
+  remarks     String
+
+  @@index([minutesId])
 }
 
 model ActivitySegment {

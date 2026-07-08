@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.9',
+    date: '2026-07-08',
+    title: 'Meeting minutes',
+    items: [
+      'Ending a meeting now opens a Minutes of Meeting form — date, members, agenda, and a row per topic (details, decision, responsible, timeline, remarks). The meeting only ends once it’s filled in.',
+      'Saved minutes show up when you open that meeting’s session on the day timeline.',
+    ],
+  },
+  {
     version: '1.8.1',
     date: '2026-07-06',
     title: 'Ask about any session',

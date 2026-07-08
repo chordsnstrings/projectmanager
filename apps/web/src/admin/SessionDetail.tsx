@@ -145,8 +145,44 @@ export default function SessionDetail({
           </ul>
         )}
       </div>
-      {breakdown.length === 0 && session.commits.length === 0 && (
+      {breakdown.length === 0 && session.commits.length === 0 && !session.meetingMinutes && (
         <div className="font-mono text-[11px] text-text3">no segments or commits recorded</div>
+      )}
+
+      {session.meetingMinutes && (
+        <div className="mt-3.5 border-t border-hair pt-3">
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[11px] text-text3 mb-2">
+            <span className="text-brass uppercase tracking-[0.08em]">minutes of meeting</span>
+            <span><span className="text-text3">date</span> <span className="text-text2">{session.meetingMinutes.date}</span></span>
+            <span><span className="text-text3">members</span> <span className="text-text2">{session.meetingMinutes.attendees}</span></span>
+          </div>
+          <div className="text-xs text-text2 mb-2">
+            <span className="text-text3">agenda · </span>{session.meetingMinutes.agenda}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[640px] text-[11px]">
+              <thead>
+                <tr className="text-text3">
+                  {['Topic', 'Details', 'Decision', 'Responsible', 'Timeline', 'Remarks'].map((h) => (
+                    <th key={h} className="font-normal uppercase tracking-wide py-1.5 pr-3">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {session.meetingMinutes.items.map((it, i) => (
+                  <tr key={i} className="border-t border-hair align-top">
+                    <td className="py-1.5 pr-3 text-text2">{it.topic}</td>
+                    <td className="py-1.5 pr-3 text-text2 whitespace-pre-wrap">{it.details}</td>
+                    <td className="py-1.5 pr-3 text-text2 whitespace-pre-wrap">{it.decision}</td>
+                    <td className="py-1.5 pr-3 text-text2">{it.responsible}</td>
+                    <td className="py-1.5 pr-3 text-text2">{it.timeline}</td>
+                    <td className="py-1.5 pr-3 text-text3">{it.remarks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {questions.length > 0 && (

@@ -200,7 +200,11 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
       startedAt: { lt: dayEnd },
       OR: [{ endedAt: null }, { endedAt: { gt: dayStart } }],
     },
-    include: { segments: true, task: { include: { repo: { select: { fullName: true } } } } },
+    include: {
+      segments: true,
+      task: { include: { repo: { select: { fullName: true } } } },
+      meetingMinutes: { include: { items: true } },
+    },
     orderBy: { startedAt: 'asc' },
   });
 
@@ -298,6 +302,23 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
       commits: commitsBySession.get(s.id) ?? [],
       flagIds: flagsBySession.get(s.id) ?? [],
       questionIds: questionsBySession.get(s.id) ?? [],
+      meetingMinutes: s.meetingMinutes
+        ? {
+            date: s.meetingMinutes.date,
+            attendees: s.meetingMinutes.attendees,
+            agenda: s.meetingMinutes.agenda,
+            items: [...s.meetingMinutes.items]
+              .sort((a, b) => a.order - b.order)
+              .map((it) => ({
+                topic: it.topic,
+                details: it.details,
+                decision: it.decision,
+                responsible: it.responsible,
+                timeline: it.timeline,
+                remarks: it.remarks,
+              })),
+          }
+        : null,
     }));
 
     // One lane = one task → union (overlapping/duplicate timers on the same task

@@ -110,7 +110,16 @@ export function dominantSegment(segments: ActivitySegment[]): ActivityType | nul
   return best;
 }
 
-export function sessionToDTO(s: Session & { segments: ActivitySegment[] }): SessionDTO {
+type MinutesRow = {
+  date: string;
+  attendees: string;
+  agenda: string;
+  items: { topic: string; details: string; decision: string; responsible: string; timeline: string; remarks: string; order: number }[];
+};
+
+export function sessionToDTO(
+  s: Session & { segments: ActivitySegment[]; meetingMinutes?: MinutesRow | null },
+): SessionDTO {
   return {
     id: s.id,
     userId: s.userId,
@@ -129,5 +138,22 @@ export function sessionToDTO(s: Session & { segments: ActivitySegment[] }): Sess
       endedAt: seg.endedAt.toISOString(),
     })),
     inferredActivity: dominantSegment(s.segments),
+    meetingMinutes: s.meetingMinutes
+      ? {
+          date: s.meetingMinutes.date,
+          attendees: s.meetingMinutes.attendees,
+          agenda: s.meetingMinutes.agenda,
+          items: [...s.meetingMinutes.items]
+            .sort((a, b) => a.order - b.order)
+            .map((it) => ({
+              topic: it.topic,
+              details: it.details,
+              decision: it.decision,
+              responsible: it.responsible,
+              timeline: it.timeline,
+              remarks: it.remarks,
+            })),
+        }
+      : null,
   };
 }

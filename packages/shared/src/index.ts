@@ -205,7 +205,29 @@ export interface SessionDTO {
   segments: ActivitySegmentDTO[];
   /** dominant inferred activity (drives the 3px running-row edge, §9) */
   inferredActivity: ActivityType | null;
+  /** minutes of meeting, present only for stopped `meeting` sessions */
+  meetingMinutes?: MeetingMinutesDTO | null;
 }
+
+// ── Minutes of Meeting (MoM) ────────────────────────────────────────────────
+// Captured before a `meeting` off-task session may be stopped. All fields are
+// required; the session cannot end until a valid MoM is on file.
+export interface MeetingMinutesItemDTO {
+  topic: string;
+  details: string;
+  decision: string;
+  responsible: string;
+  timeline: string;
+  remarks: string;
+}
+export interface MeetingMinutesDTO {
+  date: string; // YYYY-MM-DD
+  attendees: string;
+  agenda: string;
+  items: MeetingMinutesItemDTO[];
+}
+/** Request body for POST /sessions/:id/meeting-minutes (also stops the session). */
+export type MeetingMinutesBody = MeetingMinutesDTO;
 
 export interface StartSessionBody {
   taskId?: string;
@@ -495,6 +517,8 @@ export interface TimelineSession {
   commits: CommitDTO[];
   flagIds: string[];
   questionIds: string[];
+  /** MoM for a stopped `meeting` session (read-only review) */
+  meetingMinutes?: MeetingMinutesDTO | null;
 }
 
 export interface DayTimeline {
