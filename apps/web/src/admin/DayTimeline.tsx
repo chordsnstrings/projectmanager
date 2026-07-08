@@ -8,6 +8,8 @@ import SessionDetail from './SessionDetail';
 export interface DayTimelineProps {
   data: DayTimelineDTO;
   onAskQuestion?: (args: { targetUserId: string; taskId: string | null; sessionId: string; body: string }) => void;
+  /** turn a MoM action item into a trackable task (by item id) */
+  onCreateTaskFromItem?: (itemId: string) => Promise<void>;
 }
 
 function HeaderCard({
@@ -66,7 +68,7 @@ function concurrentBands(
   return bands;
 }
 
-export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
+export default function DayTimeline({ data, onAskQuestion, onCreateTaskFromItem }: DayTimelineProps) {
   const tz = data.timezone;
   const w = makeWindow(data.dayStart, data.dayEnd);
   const ticks = hourTicks(w, tz);
@@ -191,6 +193,7 @@ export default function DayTimeline({ data, onAskQuestion }: DayTimelineProps) {
           }}
           questions={data.questions.filter((q) => q.sessionId === selected.id)}
           canAsk
+          onCreateTaskFromItem={onCreateTaskFromItem}
           onAsk={
             onAskQuestion
               ? (body) =>

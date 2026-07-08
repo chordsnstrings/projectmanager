@@ -114,7 +114,7 @@ type MinutesRow = {
   date: string;
   attendees: string;
   agenda: string;
-  items: { topic: string; details: string; decision: string; responsible: string; timeline: string; remarks: string; order: number }[];
+  items: { id: string; topic: string; details: string; decision: string; responsible: string; timeline: string; remarks: string; order: number; taskId: string | null }[];
 };
 
 export function sessionToDTO(
@@ -146,12 +146,14 @@ export function sessionToDTO(
           items: [...s.meetingMinutes.items]
             .sort((a, b) => a.order - b.order)
             .map((it) => ({
+              id: it.id,
               topic: it.topic,
               details: it.details,
               decision: it.decision,
               responsible: it.responsible,
               timeline: it.timeline,
               remarks: it.remarks,
+              taskId: it.taskId,
             })),
         }
       : null,

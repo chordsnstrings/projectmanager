@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { QuestionDTO, TimelineSession } from '@cadence/shared';
 import { ACTIVITY_COLORS } from '../lib/activity';
 import { fmtClock, fmtDuration, relativeTime } from '../lib/format';
+import { exportMinutes } from '../lib/exportMinutes';
 
 function activityBreakdown(session: TimelineSession): { type: string; minutes: number }[] {
   const totals = new Map<string, number>();
@@ -23,6 +24,7 @@ export default function SessionDetail({
   canAsk = false,
   autoAsk = false,
   questions = [],
+  onCreateTaskFromItem,
 }: {
   session: TimelineSession;
   laneTitle: string;
@@ -35,10 +37,13 @@ export default function SessionDetail({
   autoAsk?: boolean;
   /** questions already raised on this session (thread) */
   questions?: QuestionDTO[];
+  /** turn a MoM action item into a trackable task (by item id) */
+  onCreateTaskFromItem?: (itemId: string) => Promise<void>;
 }) {
   const breakdown = activityBreakdown(session);
   const [asking, setAsking] = useState(autoAsk && canAsk);
   const [body, setBody] = useState('');
+  const [busyItem, setBusyItem] = useState<number | null>(null);
   return (
     <div className="border-t border-hair2 bg-surface/50 px-4 sm:px-5 py-4 animate-fade-in">
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -151,21 +156,32 @@ export default function SessionDetail({
 
       {session.meetingMinutes && (
         <div className="mt-3.5 border-t border-hair pt-3">
-          <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[11px] text-text3 mb-2">
-            <span className="text-brass uppercase tracking-[0.08em]">minutes of meeting</span>
-            <span><span className="text-text3">date</span> <span className="text-text2">{session.meetingMinutes.date}</span></span>
-            <span><span className="text-text3">members</span> <span className="text-text2">{session.meetingMinutes.attendees}</span></span>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[11px] text-text3">
+              <span className="text-brass uppercase tracking-[0.08em]">minutes of meeting</span>
+              <span><span className="text-text3">date</span> <span className="text-text2">{session.meetingMinutes.date}</span></span>
+              <span><span className="text-text3">members</span> <span className="text-text2">{session.meetingMinutes.attendees}</span></span>
+            </div>
+            <button
+              type="button"
+              onClick={() => exportMinutes(session.meetingMinutes!, laneTitle)}
+              className="btn btn-sm btn-ghost shrink-0"
+              title="download the minutes as a Word document"
+            >
+              ⭳ export
+            </button>
           </div>
           <div className="text-xs text-text2 mb-2">
             <span className="text-text3">agenda · </span>{session.meetingMinutes.agenda}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[640px] text-[11px]">
+            <table className="w-full text-left min-w-[680px] text-[11px]">
               <thead>
                 <tr className="text-text3">
                   {['Topic', 'Details', 'Decision', 'Responsible', 'Timeline', 'Remarks'].map((h) => (
                     <th key={h} className="font-normal uppercase tracking-wide py-1.5 pr-3">{h}</th>
                   ))}
+                  {onCreateTaskFromItem && <th className="font-normal uppercase tracking-wide py-1.5 text-right">Action</th>}
                 </tr>
               </thead>
               <tbody>
@@ -177,6 +193,30 @@ export default function SessionDetail({
                     <td className="py-1.5 pr-3 text-text2">{it.responsible}</td>
                     <td className="py-1.5 pr-3 text-text2">{it.timeline}</td>
                     <td className="py-1.5 pr-3 text-text3">{it.remarks}</td>
+                    {onCreateTaskFromItem && (
+                      <td className="py-1.5 text-right whitespace-nowrap">
+                        {it.taskId ? (
+                          <span className="font-mono text-[10px] text-success">✓ task</span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busyItem === i || !it.id}
+                            onClick={async () => {
+                              if (!it.id) return;
+                              setBusyItem(i);
+                              try {
+                                await onCreateTaskFromItem(it.id);
+                              } finally {
+                                setBusyItem(null);
+                              }
+                            }}
+                            className="font-mono text-[10px] text-brass hover:text-brass/80 disabled:text-text3"
+                          >
+                            {busyItem === i ? '…' : '→ task'}
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -62,6 +62,9 @@ export interface ProgrammerScreenProps {
   onSignOut?: () => void;
   onRefresh?: () => void;
   onRename?: (taskId: string, title: string) => void;
+  /** viewer id + mark-done, for completing owned tasks */
+  meId?: string;
+  onMarkDone?: (taskId: string) => void | Promise<void>;
   syncing?: boolean;
   /** running off-task sessions (no task row to control them from) */
   offTaskRunning?: SessionDTO[];
@@ -258,6 +261,8 @@ export default function ProgrammerScreen({
   onSignOut = noop,
   onRefresh = noop,
   onRename = noop,
+  meId,
+  onMarkDone = noop,
   syncing = false,
   offTaskRunning = [],
   onStopOffTask = noop,
@@ -404,6 +409,8 @@ export default function ProgrammerScreen({
                   onSaveSummary={onSaveSummary}
                   onRename={onRename}
                   onRefresh={onRefresh}
+                  meId={meId}
+                  onMarkDone={onMarkDone}
                   activityKeys={activityKeys}
                 />
               );

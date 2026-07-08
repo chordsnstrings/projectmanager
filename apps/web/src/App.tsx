@@ -293,6 +293,17 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     [refresh, me.id],
   );
 
+  // Mark one of your own tasks complete (server allows the assignee to set done).
+  const onMarkDone = useCallback(
+    async (taskId: string) => {
+      await api(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) })
+        .then(() => toast('Task marked complete', 'success'))
+        .catch(() => toast('Couldn’t complete the task', 'error'));
+      await refresh();
+    },
+    [refresh],
+  );
+
   const onAnswerQuestion = useCallback(
     async (id: string, answer: string) => {
       await api(`/questions/${id}/answer`, { method: 'POST', body: JSON.stringify({ answer }) }).catch(
@@ -331,6 +342,18 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     void loadDay();
   }, [view, loadDay]);
   usePoll(loadDay, 30000, view === 'day' && dayDate === todayStr()); // keep today's view current
+
+  // The runner can turn their own meeting's action items into team tasks.
+  const onCreateTaskFromItem = useCallback(
+    async (itemId: string) => {
+      await api(`/meeting-items/${itemId}/task`, { method: 'POST', body: '{}' })
+        .then(() => toast('Task created from the minutes', 'success'))
+        .catch(() => toast('Couldn’t create the task', 'error'));
+      await loadDay();
+      await refresh();
+    },
+    [loadDay, refresh],
+  );
 
   useEffect(() => {
     if (view !== 'progress') return;
@@ -534,7 +557,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
           {view === 'day' ? (
             day ? (
               <>
-                <DayTimeline data={day} />
+                <DayTimeline data={day} onCreateTaskFromItem={onCreateTaskFromItem} />
                 <p className="text-center font-mono text-[11px] text-text3">
                   active = real time worked (overlaps counted once) · task hrs = effort across tasks
                 </p>
@@ -581,6 +604,8 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         sessionsByTask={sessionsByTask}
         moreTasks={tasksCursor != null}
         onLoadMoreTasks={onLoadMoreTasks}
+        meId={me.id}
+        onMarkDone={onMarkDone}
         onStart={onStart}
         onStop={onStop}
         onEditSummary={onEditSummary}
@@ -846,6 +871,17 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     [loadQuestions, loadDay, selectedUser],
   );
 
+  // Turn a meeting-minutes action item into a trackable team task.
+  const onCreateTaskFromItem = useCallback(
+    async (itemId: string) => {
+      await api(`/meeting-items/${itemId}/task`, { method: 'POST', body: '{}' })
+        .then(() => toast('Task created from the minutes', 'success'))
+        .catch(() => toast('Couldn’t create the task', 'error'));
+      if (selectedUser) await loadDay(selectedUser);
+    },
+    [selectedUser, loadDay],
+  );
+
   const endOpenSessions = useCallback(async () => {
     if (!day) return;
     const open = day.lanes.flatMap((l) => l.sessions).filter((s) => s.isOpen);
@@ -995,7 +1031,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
             </div>
             {personView === 'day' ? (
               day ? (
-                <DayTimeline data={day} onAskQuestion={onAskQuestion} />
+                <DayTimeline data={day} onAskQuestion={onAskQuestion} onCreateTaskFromItem={onCreateTaskFromItem} />
               ) : (
                 <Loading>loading day…</Loading>
               )

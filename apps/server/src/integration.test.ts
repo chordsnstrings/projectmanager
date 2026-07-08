@@ -762,8 +762,23 @@ describe('authed API integration', () => {
       (await app.inject({ method: 'POST', url: `/sessions/${sid}/meeting-minutes`, headers: { cookie: devCookie }, payload: { date: '2026-07-01', attendees: 'm', agenda: 'a', items: [{ topic: 't', details: 'd', decision: 'd', responsible: 'r', timeline: 't', remarks: 'x' }] } })).statusCode,
     ).toBe(409);
 
-    const mm = await prisma.meetingMinutes.findUnique({ where: { sessionId: sid } });
-    await prisma.meetingMinutesItem.deleteMany({ where: { minutesId: mm!.id } });
+    // an action item can be turned into a trackable team task (once)
+    const mm = await prisma.meetingMinutes.findUniqueOrThrow({ where: { sessionId: sid }, include: { items: { orderBy: { order: 'asc' } } } });
+    const item0 = mm.items[0]!;
+    const mk = await app.inject({ method: 'POST', url: `/meeting-items/${item0.id}/task`, headers: { cookie: devCookie }, payload: {} });
+    expect(mk.statusCode).toBe(201);
+    const taskId = mk.json().id;
+    expect(mk.json().title).toBe('Pricing');
+    expect(mk.json().source).toBe('manual');
+    // idempotent: a second call returns the same task (200), no duplicate
+    const again = await app.inject({ method: 'POST', url: `/meeting-items/${item0.id}/task`, headers: { cookie: devCookie }, payload: {} });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().id).toBe(taskId);
+    const linkCount = await prisma.task.count({ where: { createdByUserId: devId, title: 'Pricing' } });
+    expect(linkCount).toBe(1);
+
+    await prisma.task.deleteMany({ where: { id: taskId } });
+    await prisma.meetingMinutesItem.deleteMany({ where: { minutesId: mm.id } });
     await prisma.meetingMinutes.deleteMany({ where: { sessionId: sid } });
     await prisma.session.deleteMany({ where: { id: sid } });
   });

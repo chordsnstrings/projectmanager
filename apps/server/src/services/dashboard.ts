@@ -310,12 +310,14 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
             items: [...s.meetingMinutes.items]
               .sort((a, b) => a.order - b.order)
               .map((it) => ({
+                id: it.id,
                 topic: it.topic,
                 details: it.details,
                 decision: it.decision,
                 responsible: it.responsible,
                 timeline: it.timeline,
                 remarks: it.remarks,
+                taskId: it.taskId,
               })),
           }
         : null,

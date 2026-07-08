@@ -213,12 +213,16 @@ export interface SessionDTO {
 // Captured before a `meeting` off-task session may be stopped. All fields are
 // required; the session cannot end until a valid MoM is on file.
 export interface MeetingMinutesItemDTO {
+  /** on read: the item's id (absent on the submit body) */
+  id?: string;
   topic: string;
   details: string;
   decision: string;
   responsible: string;
   timeline: string;
   remarks: string;
+  /** on read: the id of the task this item became (null until turned into one) */
+  taskId?: string | null;
 }
 export interface MeetingMinutesDTO {
   date: string; // YYYY-MM-DD

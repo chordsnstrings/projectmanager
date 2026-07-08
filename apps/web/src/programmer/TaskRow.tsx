@@ -49,6 +49,10 @@ export interface TaskRowProps {
   onRename?: (taskId: string, title: string) => void;
   /** refresh the board (e.g. after connecting git) */
   onRefresh?: () => void;
+  /** the viewer's user id — enables "mark complete" on their own tasks */
+  meId?: string;
+  /** mark a task done (assignee only) */
+  onMarkDone?: (taskId: string) => void | Promise<void>;
 }
 
 const noop = () => {};
@@ -127,6 +131,8 @@ export default function TaskRow({
   onSaveSummary = noop,
   onRename = noop,
   onRefresh = noop,
+  meId,
+  onMarkDone = noop,
   activityKeys,
 }: TaskRowProps) {
   const running = state === 'running';
@@ -137,6 +143,7 @@ export default function TaskRow({
   const [starting, setStarting] = useState(false);
   const [intentText, setIntentText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [completing, setCompleting] = useState(false);
   // Manual tasks (and anything with a brief/plan) carry a details panel:
   // description, the approved step-by-step, and a comment thread.
   const hasDetails = !!(task.description || task.plan) || task.source === 'manual';
@@ -308,6 +315,26 @@ export default function TaskRow({
             <div className="font-mono text-[11px] text-text3">Steps are being prepared — pending approval.</div>
           ) : null}
           {task.source === 'manual' && <TaskGitConnect task={task} onConnected={onRefresh} />}
+          {meId && task.assigneeUserId === meId && task.status !== 'done' && (
+            <div className="border-t border-hair pt-3">
+              <button
+                type="button"
+                disabled={completing}
+                onClick={async () => {
+                  if (completing) return;
+                  setCompleting(true);
+                  try {
+                    await onMarkDone(task.id);
+                  } finally {
+                    setCompleting(false);
+                  }
+                }}
+                className="btn btn-sm border-success/40 text-success hover:bg-success/10 disabled:opacity-60"
+              >
+                {completing ? 'completing…' : '✓ Mark complete'}
+              </button>
+            </div>
+          )}
           <div className="border-t border-hair pt-3">
             <TaskDiscussion taskId={task.id} />
           </div>

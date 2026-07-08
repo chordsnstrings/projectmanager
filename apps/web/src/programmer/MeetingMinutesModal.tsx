@@ -8,7 +8,8 @@ import { useLockBodyScroll } from '../lib/useModal';
  * Every field is required: the session only ends once a complete MoM is filed
  * (there is no skip). Cancelling leaves the meeting running.
  */
-const ITEM_FIELDS: { key: keyof MeetingMinutesItemDTO; label: string; placeholder: string; wide?: boolean }[] = [
+type EditKey = 'topic' | 'details' | 'decision' | 'responsible' | 'timeline' | 'remarks';
+const ITEM_FIELDS: { key: EditKey; label: string; placeholder: string; wide?: boolean }[] = [
   { key: 'topic', label: 'Topic', placeholder: 'e.g. Revision of price' },
   { key: 'details', label: 'Details', placeholder: 'What was discussed', wide: true },
   { key: 'decision', label: 'Decision', placeholder: 'What was decided', wide: true },
@@ -44,7 +45,7 @@ export default function MeetingMinutesModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const setItem = (i: number, key: keyof MeetingMinutesItemDTO, v: string) =>
+  const setItem = (i: number, key: EditKey, v: string) =>
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, [key]: v } : it)));
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (i: number) => setItems((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));

@@ -12,10 +12,11 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '1.9',
     date: '2026-07-08',
-    title: 'Meeting minutes',
+    title: 'Meeting minutes → action items',
     items: [
       'Ending a meeting now opens a Minutes of Meeting form — date, members, agenda, and a row per topic (details, decision, responsible, timeline, remarks). The meeting only ends once it’s filled in.',
-      'Saved minutes show up when you open that meeting’s session on the day timeline.',
+      'Open a meeting on the day timeline to review the minutes, export them as a Word document, or turn any action item into a trackable task with one tap.',
+      'Mark your own tasks complete right from the board — so those action items can be closed out on the day.',
     ],
   },
   {

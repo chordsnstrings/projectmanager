@@ -292,6 +292,7 @@ model MeetingMinutesItem {
   responsible String
   timeline    String
   remarks     String
+  taskId      String? // set when this action item has been turned into a trackable task
 
   @@index([minutesId])
 }

@@ -507,6 +507,55 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(dto);
   });
 
+  // Turn a meeting-minutes action item into a trackable manual task, in the
+  // meeting runner's team (unassigned → the team pool). Idempotent: an item that
+  // already has a task returns it. Manager of that team, or the runner, may act.
+  app.post<{ Params: { itemId: string } }>('/meeting-items/:itemId/task', async (req, reply) => {
+    const actor = await requireUser(req, reply);
+    if (!actor) return;
+    const item = await prisma.meetingMinutesItem.findUnique({
+      where: { id: req.params.itemId },
+      include: { minutes: { include: { session: { select: { userId: true, user: { select: { teamId: true } } } } } } },
+    });
+    if (!item) return reply.code(404).send({ error: 'item_not_found' });
+    const runnerId = item.minutes.session.userId;
+    const teamId = item.minutes.session.user.teamId;
+    const isManager = actor.role === 'admin' || (actor.role === 'lead' && !!teamId && teamId === actor.teamId);
+    if (!isManager && actor.id !== runnerId) return reply.code(403).send({ error: 'forbidden' });
+    if (!teamId) return reply.code(409).send({ error: 'no_team' });
+
+    // Already created → return the existing task (idempotent).
+    if (item.taskId) {
+      const existing = await prisma.task.findFirst({ where: { id: item.taskId, deletedAt: null }, include: managedInclude });
+      if (existing) return toManaged(existing);
+    }
+
+    const descParts = [
+      item.details && `Details: ${item.details}`,
+      item.decision && `Decision: ${item.decision}`,
+      item.responsible && `Responsible: ${item.responsible}`,
+      item.timeline && `Timeline: ${item.timeline}`,
+      item.remarks && item.remarks.toLowerCase() !== 'n/a' && `Remarks: ${item.remarks}`,
+    ].filter(Boolean);
+
+    const created = await prisma.task.create({
+      data: {
+        source: 'manual',
+        repoId: null,
+        teamId,
+        title: item.topic.slice(0, 200),
+        description: descParts.join('\n').slice(0, 4000) || null,
+        status: 'todo',
+        assigneeUserId: null,
+        createdByUserId: actor.id,
+      },
+      include: managedInclude,
+    });
+    await prisma.meetingMinutesItem.update({ where: { id: item.id }, data: { taskId: created.id } });
+    req.log.info({ audit: 'meeting.item.task', itemId: item.id, taskId: created.id, by: actor.id, team: teamId }, 'audit');
+    return reply.code(201).send(await toManaged(created));
+  });
+
   // "Create the git": make a branch in a connected repo and link it to the task.
   app.post<{ Params: { id: string }; Body: { repoId?: string; branch?: string } }>(
     '/tasks/:id/git',
