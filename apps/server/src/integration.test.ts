@@ -746,6 +746,13 @@ describe('authed API integration', () => {
     const mine = await app.inject({ method: 'GET', url: '/me/meetings', headers: { cookie: devCookie } });
     expect(mine.json().some((m: { id: string }) => m.id === mid)).toBe(true);
 
+    // and it appears on the attendee's day timeline (planned block). devId has no
+    // timezone → UTC day boundaries, so the UTC date of `future` is its day.
+    const dayStr = future.slice(0, 10);
+    const timeline = await app.inject({ method: 'GET', url: `/dashboard/user/${devId}/day?date=${dayStr}`, headers: { cookie: adminCookie } });
+    expect(timeline.statusCode).toBe(200);
+    expect(timeline.json().meetings.some((m: { id: string }) => m.id === mid)).toBe(true);
+
     // the organizer can cancel; then it drops off the manager list
     expect((await app.inject({ method: 'DELETE', url: `/meetings/${mid}`, headers: { cookie: adminCookie } })).statusCode).toBe(200);
     const list = await app.inject({ method: 'GET', url: '/meetings', headers: { cookie: adminCookie } });

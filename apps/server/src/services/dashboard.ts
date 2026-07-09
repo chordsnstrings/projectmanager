@@ -208,6 +208,29 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
     orderBy: { startedAt: 'asc' },
   });
 
+  // Scheduled meetings overlapping the day where this user is an attendee or the
+  // organizer — shown as planned blocks on the timeline (not tracked time).
+  const dayMeetings = await prisma.meeting.findMany({
+    where: {
+      canceledAt: null,
+      scheduledAt: { lt: dayEnd },
+      OR: [{ createdByUserId: userId }, { attendees: { some: { userId } } }],
+    },
+    select: { id: true, title: true, scheduledAt: true, durationMinutes: true, location: true, createdByUserId: true },
+    orderBy: { scheduledAt: 'asc' },
+  });
+  const timelineMeetings = dayMeetings
+    .map((m) => ({
+      id: m.id,
+      title: m.title,
+      scheduledAt: m.scheduledAt.toISOString(),
+      endAt: new Date(m.scheduledAt.getTime() + m.durationMinutes * 60_000).toISOString(),
+      location: m.location,
+      organizer: m.createdByUserId === userId,
+    }))
+    // keep only meetings whose window actually overlaps this local day
+    .filter((m) => new Date(m.endAt).getTime() > dayStart.getTime());
+
   const dayFlags = await prisma.flag.findMany({
     where: { userId, createdAt: { gte: dayStart, lte: dayEnd } },
   });
@@ -403,6 +426,7 @@ export async function buildDayTimeline(userId: string, dateArg?: string): Promis
       };
     }),
     lanes,
+    meetings: timelineMeetings,
   };
 }
 

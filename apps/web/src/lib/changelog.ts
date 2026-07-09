@@ -16,6 +16,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       'Managers can schedule a meeting for specific people at a future time (with agenda, duration and a room/link) from the new Meetings tab.',
       'Invitees see it on their board with a countdown, get notified, and can start it in one tap when it’s time — which flows straight into the minutes form.',
+      'Scheduled meetings now appear as planned blocks on each attendee’s day timeline, at their booked time.',
+      'Reminders go out ~15 minutes before a meeting — by email as well as push.',
     ],
   },
   {

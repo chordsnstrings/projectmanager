@@ -1,9 +1,43 @@
 import { useState } from 'react';
-import type { DayTimeline as DayTimelineDTO, TimelineSession } from '@cadence/shared';
+import type { DayTimeline as DayTimelineDTO, TimelineMeeting, TimelineSession } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
-import { hourTicks, makeWindow, pct, type TimeWindow } from './timeScale';
+import { barGeom, hourTicks, makeWindow, pct, type TimeWindow } from './timeScale';
 import Lane from './lane';
 import SessionDetail from './SessionDetail';
+
+/** Planned-meetings row: dashed brass blocks at each meeting's scheduled time. */
+function MeetingLane({ meetings, window: w, tz }: { meetings: TimelineMeeting[]; window: TimeWindow; tz?: string }) {
+  const ticks = hourTicks(w, tz);
+  return (
+    <div className="flex items-stretch border-b border-hair bg-brass/[0.02]">
+      <div className="w-40 sm:w-56 shrink-0 px-4 py-3 border-r border-hair">
+        <div className="font-mono text-xs text-brass/80">meetings</div>
+        <div className="font-mono text-[11px] text-text3 mt-0.5">{meetings.length} scheduled</div>
+      </div>
+      <div className="relative flex-1 min-w-0 py-3 px-2">
+        {ticks.map((t) => (
+          <span key={t.left} className="absolute top-0 bottom-0 w-px bg-hair" style={{ left: `${t.left}%` }} aria-hidden />
+        ))}
+        <div className="relative h-6">
+          {meetings.map((m) => {
+            const g = barGeom(m.scheduledAt, m.endAt, w);
+            const when = new Date(m.scheduledAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            return (
+              <div
+                key={m.id}
+                className="absolute top-0 h-6 rounded-md border border-dashed border-brass/60 bg-brass/[0.12] flex items-center px-1.5 overflow-hidden"
+                style={{ left: `${g.left}%`, width: `${g.width}%`, minWidth: 6 }}
+                title={`${m.title} · ${when}${m.location ? ` · ${m.location}` : ''}${m.organizer ? ' · you organize' : ''}`}
+              >
+                <span className="font-mono text-[10px] text-brass truncate">{m.title}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export interface DayTimelineProps {
   data: DayTimelineDTO;
@@ -155,7 +189,9 @@ export default function DayTimeline({ data, onAskQuestion, onCreateTaskFromItem 
               </div>
             </div>
 
-            {data.lanes.length === 0 ? (
+            {data.meetings.length > 0 && <MeetingLane meetings={data.meetings} window={w} tz={tz} />}
+
+            {data.lanes.length === 0 && data.meetings.length === 0 ? (
               <div className="px-4 py-12 text-center text-sm text-text3">No sessions this day.</div>
             ) : (
               data.lanes.map((lane) => (

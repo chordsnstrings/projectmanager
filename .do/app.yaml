@@ -87,10 +87,17 @@ jobs:
     instance_size_slug: apps-s-1vcpu-0.5gb
     envs:
       - { key: DATABASE_URL, value: ${db.DATABASE_URL}, scope: RUN_TIME }
+      - { key: APP_BASE_URL, value: ${APP_URL}, scope: RUN_TIME }
       # Web Push for meeting reminders (dormant until the VAPID keys are set).
       - { key: VAPID_PUBLIC_KEY, scope: RUN_TIME }
       - { key: VAPID_PRIVATE_KEY, scope: RUN_TIME, type: SECRET }
       - { key: VAPID_SUBJECT, scope: RUN_TIME, value: "mailto:chordsnstrings@users.noreply.github.com" }
+      # SMTP so meeting reminders can also go out by email (~15 min prior).
+      - { key: SMTP_HOST, scope: RUN_TIME }
+      - { key: SMTP_PORT, scope: RUN_TIME }
+      - { key: SMTP_USER, scope: RUN_TIME, type: SECRET }
+      - { key: SMTP_PASS, scope: RUN_TIME, type: SECRET }
+      - { key: MAIL_FROM, scope: RUN_TIME }
   - name: digest
     kind: SCHEDULED
     schedule:

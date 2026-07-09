@@ -180,6 +180,7 @@ export const dayTimelineFixture: DayTimeline = {
   flags: dayFlags,
   questions: [],
   lanes: [laneRateLimit, laneOauth, laneSpike],
+  meetings: [],
 };
 
 // ── Team dashboard — 3 members ───────────────────────────────────────────────

@@ -567,6 +567,18 @@ export interface DayTimeline {
   flags: FlagDTO[];
   questions: QuestionDTO[];
   lanes: TimelineLane[];
+  /** scheduled meetings overlapping this day (planned, not tracked time) */
+  meetings: TimelineMeeting[];
+}
+
+/** A scheduled meeting placed on the day timeline at its planned time. */
+export interface TimelineMeeting {
+  id: string;
+  title: string;
+  scheduledAt: string;
+  endAt: string; // scheduledAt + durationMinutes
+  location: string | null;
+  organizer: boolean; // is this timeline's user the organizer
 }
 
 export interface TrendPoint {
