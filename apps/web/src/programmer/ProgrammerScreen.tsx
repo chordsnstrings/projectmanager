@@ -61,6 +61,8 @@ export interface ProgrammerScreenProps {
   onDismissNudge?: (nudge: NudgeDTO) => void;
   onStartOffTask?: () => void;
   onSignOut?: () => void;
+  /** managers only — return to the team dashboard from their own work board */
+  onExitToDashboard?: () => void;
   onRefresh?: () => void;
   onRename?: (taskId: string, title: string) => void;
   /** viewer id + mark-done, for completing owned tasks */
@@ -313,6 +315,7 @@ export default function ProgrammerScreen({
   onDismissNudge = noop,
   onStartOffTask = noop,
   onSignOut = noop,
+  onExitToDashboard,
   onRefresh = noop,
   onRename = noop,
   meId,
@@ -341,6 +344,16 @@ export default function ProgrammerScreen({
       <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Logo size={20} />
+          {onExitToDashboard && (
+            <button
+              type="button"
+              onClick={() => onExitToDashboard()}
+              className="btn btn-sm btn-ghost shrink-0"
+              title="back to the team dashboard"
+            >
+              ← Dashboard
+            </button>
+          )}
           <span className="hidden sm:inline text-sm font-medium text-text2 tracking-tightish truncate">{date}</span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">

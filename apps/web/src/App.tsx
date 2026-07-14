@@ -128,7 +128,9 @@ export default function App() {
     const p = route.path;
     if (auth.me.role === 'dev') {
       if (!p.startsWith('/board')) route.navigate('/board', true);
-    } else if (!p.startsWith('/admin')) {
+    } else if (!p.startsWith('/admin') && !p.startsWith('/board')) {
+      // Admins/leads land on the dashboard, but may also use their own work
+      // board at /board (to start/stop their own sessions like anyone else).
       route.navigate('/admin/team', true);
     }
   }, [auth, route.path, route.navigate]);
@@ -147,8 +149,13 @@ export default function App() {
     void api('/me/seen', { method: 'POST', body: JSON.stringify({ version }) }).catch(() => {});
   };
   // Owners and leads use the admin app (team-scoped server-side); devs the board.
+  // Any role can open their own work board at /board to start/stop sessions.
   const screen =
-    auth.me.role === 'dev' ? <DevApp me={auth.me} route={route} /> : <AdminApp me={auth.me} route={route} />;
+    auth.me.role === 'dev' || route.path.startsWith('/board') ? (
+      <DevApp me={auth.me} route={route} />
+    ) : (
+      <AdminApp me={auth.me} route={route} />
+    );
   return (
     <>
       {screen}
@@ -686,6 +693,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onRefresh={doSync}
         onRename={onRename}
         onSignOut={signOut}
+        onExitToDashboard={me.role === 'dev' ? undefined : () => navigate('/admin/team')}
         runningTasks={runningTasks}
         offTaskRunning={active.filter((s) => !s.taskId && s.isOpen)}
         onStopOffTask={onStopOffTask}
@@ -1081,6 +1089,13 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
           </span>
         </div>
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => navigate('/board')}
+            className="btn btn-sm btn-ghost"
+            title="your own work board — start & stop your sessions"
+          >
+            My work
+          </button>
           <GuideButton />
           <NotificationToggle />
           <InstallButton />

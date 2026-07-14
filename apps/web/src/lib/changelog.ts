@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.4',
+    date: '2026-07-14',
+    title: 'Admins & leads can track their own work',
+    items: [
+      'Managers now have a “My work” board of their own — start and stop your own sessions just like anyone on the team, then hop back to the dashboard.',
+    ],
+  },
+  {
     version: '2.0.3',
     date: '2026-07-14',
     title: 'Stop idle sessions from a flag',
