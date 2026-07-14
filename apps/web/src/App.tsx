@@ -42,6 +42,7 @@ import Toasts, { toast } from './components/Toasts';
 import BoardSkeleton, { ListSkeleton } from './components/Skeleton';
 import ConfirmDialogHost, { confirmDialog } from './components/ConfirmDialog';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
+import MeetingMinutesModal from './programmer/MeetingMinutesModal';
 import TeamOverview from './admin/TeamOverview';
 import TeamDay from './admin/TeamDay';
 import DayTimeline from './admin/DayTimeline';
@@ -62,6 +63,13 @@ type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: 
 async function signOut() {
   await api('/auth/logout', { method: 'POST' }).catch(() => {});
   window.location.href = '/';
+}
+
+// A `meeting` session can't stop until its minutes are filed — the server 409s.
+// Detect that so any stop entry point can open the Minutes modal instead of a
+// raw error (covers old cached bundles + every stop path).
+function isMeetingGate(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 409 && (e.body as { error?: string } | undefined)?.error === 'meeting_minutes_required';
 }
 
 export interface Route {
@@ -227,6 +235,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [pool, setPool] = useState<TaskDTO[]>([]);
   const [tasksCursor, setTasksCursor] = useState<string | null>(null);
   const [myMeetings, setMyMeetings] = useState<MeetingDTO[]>([]);
+  const [meetingToStop, setMeetingToStop] = useState<SessionDTO | null>(null);
   const [stopOnCommit, setStopOnCommit] = useState(me.stopOnCommit);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -416,13 +425,24 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       } catch {
         /* no draft (e.g. off-task) */
       }
-      await api<SessionDTO>(`/sessions/${sessionId}/stop`, {
-        method: 'POST',
-        body: JSON.stringify(summary ? { summary } : {}),
-      }).catch(() => toast('Couldn’t stop the session — it’s still running', 'error'));
+      try {
+        await api<SessionDTO>(`/sessions/${sessionId}/stop`, {
+          method: 'POST',
+          body: JSON.stringify(summary ? { summary } : {}),
+        });
+      } catch (e) {
+        if (isMeetingGate(e)) {
+          const s = active.find((x) => x.id === sessionId);
+          if (s) {
+            setMeetingToStop(s);
+            return;
+          }
+        }
+        toast('Couldn’t stop the session — it’s still running', 'error');
+      }
       await refresh();
     },
-    [refresh],
+    [refresh, active],
   );
 
   const onEditSummary = useCallback(
@@ -450,12 +470,21 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
 
   const onStopOffTask = useCallback(
     async (sessionId: string) => {
-      await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' }).catch(() =>
-        toast('Couldn’t stop the session', 'error'),
-      );
+      try {
+        await api<SessionDTO>(`/sessions/${sessionId}/stop`, { method: 'POST', body: '{}' });
+      } catch (e) {
+        if (isMeetingGate(e)) {
+          const s = active.find((x) => x.id === sessionId);
+          if (s) {
+            setMeetingToStop(s);
+            return;
+          }
+        }
+        toast('Couldn’t stop the session', 'error');
+      }
       await refresh();
     },
-    [refresh],
+    [refresh, active],
   );
 
   // Start a meeting session for a scheduled meeting — intent = its title, so the
@@ -656,6 +685,17 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         stopOnCommit={stopOnCommit}
         onToggleStopOnCommit={onToggleStopOnCommit}
       />
+      {/* Global safety net: any meeting-stop that 409s opens the Minutes form. */}
+      {meetingToStop && (
+        <MeetingMinutesModal
+          session={meetingToStop}
+          onCancel={() => setMeetingToStop(null)}
+          onSubmit={async (id, minutes) => {
+            await onStopMeeting(id, minutes);
+            setMeetingToStop(null);
+          }}
+        />
+      )}
     </Shell>
   );
 }

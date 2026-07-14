@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.2',
+    date: '2026-07-14',
+    title: 'Ending a meeting',
+    items: [
+      'Stopping a meeting now always opens the Minutes of Meeting form to fill in — no more error message with nowhere to save.',
+    ],
+  },
+  {
     version: '2.0.1',
     date: '2026-07-14',
     title: 'Always stoppable',
