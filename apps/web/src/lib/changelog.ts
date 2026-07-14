@@ -15,6 +15,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Ending a meeting',
     items: [
       'Stopping a meeting now always opens the Minutes of Meeting form to fill in — no more error message with nowhere to save.',
+      'Started a meeting by mistake? The minutes form now has a “discard — started by mistake” option that ends it without minutes and keeps it out of tracked time.',
     ],
   },
   {

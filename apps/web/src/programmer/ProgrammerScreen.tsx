@@ -75,6 +75,8 @@ export interface ProgrammerScreenProps {
   onStopOffTask?: (sessionId: string) => void | Promise<void>;
   /** record a meeting's minutes and stop it (required for `meeting` sessions) */
   onStopMeeting?: (sessionId: string, minutes: MeetingMinutesBody) => Promise<void>;
+  /** discard a meeting started by mistake (no minutes) */
+  onDiscardMeeting?: (sessionId: string) => Promise<void>;
   /** the caller's upcoming scheduled meetings */
   meetings?: MeetingDTO[];
   onStartMeeting?: (title: string) => void;
@@ -179,10 +181,12 @@ function OffTaskRow({
   session,
   onStop,
   onStopMeeting,
+  onDiscardMeeting,
 }: {
   session: SessionDTO;
   onStop: (id: string) => void | Promise<void>;
   onStopMeeting: (sessionId: string, minutes: MeetingMinutesBody) => Promise<void>;
+  onDiscardMeeting?: (sessionId: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [minutesOpen, setMinutesOpen] = useState(false);
@@ -229,6 +233,14 @@ function OffTaskRow({
             await onStopMeeting(id, minutes);
             setMinutesOpen(false);
           }}
+          onDiscard={
+            onDiscardMeeting
+              ? async (id) => {
+                  await onDiscardMeeting(id);
+                  setMinutesOpen(false);
+                }
+              : undefined
+          }
         />
       )}
     </div>
@@ -310,6 +322,7 @@ export default function ProgrammerScreen({
   offTaskRunning = [],
   onStopOffTask = noop,
   onStopMeeting = async () => {},
+  onDiscardMeeting,
   meetings = [],
   onStartMeeting = noop,
   questions = [],
@@ -411,7 +424,7 @@ export default function ProgrammerScreen({
               off-task running · {offTaskRunning.length}
             </div>
             {offTaskRunning.map((s) => (
-              <OffTaskRow key={s.id} session={s} onStop={onStopOffTask} onStopMeeting={onStopMeeting} />
+              <OffTaskRow key={s.id} session={s} onStop={onStopOffTask} onStopMeeting={onStopMeeting} onDiscardMeeting={onDiscardMeeting} />
             ))}
           </div>
         )}

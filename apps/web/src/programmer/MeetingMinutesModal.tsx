@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { MeetingMinutesItemDTO, SessionDTO } from '@cadence/shared';
 import { Logo } from '../components/Logo';
 import { useLockBodyScroll } from '../lib/useModal';
+import { confirmDialog } from '../components/ConfirmDialog';
 
 /**
  * Minutes of Meeting (MoM) — shown when a `meeting` off-task session is stopped.
@@ -31,10 +32,13 @@ export default function MeetingMinutesModal({
   session,
   onSubmit,
   onCancel,
+  onDiscard,
 }: {
   session: SessionDTO;
   onSubmit: (sessionId: string, minutes: { date: string; attendees: string; agenda: string; items: MeetingMinutesItemDTO[] }) => Promise<void>;
   onCancel: () => void;
+  /** discard a meeting started by mistake (no minutes, kept out of tracked time) */
+  onDiscard?: (sessionId: string) => Promise<void>;
 }) {
   useLockBodyScroll();
   const startDay = useMemo(() => new Date(session.startedAt).toLocaleDateString('en-CA'), [session.startedAt]);
@@ -66,6 +70,25 @@ export default function MeetingMinutesModal({
       // parent unmounts on success
     } catch {
       setErr('Couldn’t save the minutes — please try again.');
+      setBusy(false);
+    }
+  };
+
+  const discard = async () => {
+    if (!onDiscard || busy) return;
+    if (!(await confirmDialog({
+      title: 'Discard this meeting?',
+      body: 'It was started by mistake — no minutes are needed and it won’t count toward tracked time. This can’t be undone.',
+      confirmLabel: 'Discard',
+      danger: true,
+    }))) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await onDiscard(session.id);
+      // parent unmounts on success
+    } catch {
+      setErr('Couldn’t discard the meeting — please try again.');
       setBusy(false);
     }
   };
@@ -144,14 +167,25 @@ export default function MeetingMinutesModal({
 
         {err && <p className="font-mono text-[11px] text-danger">{err}</p>}
 
-        <footer className="flex items-center gap-3 pt-1 border-t border-hair">
-          <button onClick={onCancel} disabled={busy} className="btn btn-md btn-ghost">
-            Cancel · keep running
-          </button>
-          {!complete && <span className="font-mono text-[10px] text-text3 ml-auto">fill every field to end the meeting</span>}
-          <button onClick={submit} disabled={!complete || busy} className={`btn btn-md btn-primary ${complete ? 'ml-auto' : ''}`}>
-            {busy ? 'saving…' : 'Save & end meeting'}
-          </button>
+        <footer className="flex flex-col gap-2 pt-1 border-t border-hair">
+          <div className="flex items-center gap-3">
+            <button onClick={onCancel} disabled={busy} className="btn btn-md btn-ghost">
+              Cancel · keep running
+            </button>
+            {!complete && <span className="font-mono text-[10px] text-text3 ml-auto">fill every field to end the meeting</span>}
+            <button onClick={submit} disabled={!complete || busy} className={`btn btn-md btn-primary ${complete ? 'ml-auto' : ''}`}>
+              {busy ? 'saving…' : 'Save & end meeting'}
+            </button>
+          </div>
+          {onDiscard && (
+            <button
+              onClick={discard}
+              disabled={busy}
+              className="self-start font-mono text-[11px] text-text3 hover:text-danger disabled:opacity-50"
+            >
+              or discard — started by mistake
+            </button>
+          )}
         </footer>
       </div>
     </div>

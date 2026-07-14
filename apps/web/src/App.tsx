@@ -512,6 +512,16 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     [refresh],
   );
 
+  // Discard a meeting started by mistake — no minutes, kept out of tracked time.
+  const onDiscardMeeting = useCallback(
+    async (sessionId: string) => {
+      await api(`/sessions/${sessionId}/discard`, { method: 'POST', body: '{}' });
+      toast('Meeting discarded', 'success');
+      await refresh();
+    },
+    [refresh],
+  );
+
   const onStartOffTask = useCallback(
     async (intent?: string) => {
       await api<SessionDTO>('/sessions', {
@@ -680,6 +690,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         offTaskRunning={active.filter((s) => !s.taskId && s.isOpen)}
         onStopOffTask={onStopOffTask}
         onStopMeeting={onStopMeeting}
+        onDiscardMeeting={onDiscardMeeting}
         questions={questions}
         onAnswerQuestion={onAnswerQuestion}
         stopOnCommit={stopOnCommit}
@@ -692,6 +703,10 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
           onCancel={() => setMeetingToStop(null)}
           onSubmit={async (id, minutes) => {
             await onStopMeeting(id, minutes);
+            setMeetingToStop(null);
+          }}
+          onDiscard={async (id) => {
+            await onDiscardMeeting(id);
             setMeetingToStop(null);
           }}
         />

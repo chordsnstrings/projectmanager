@@ -160,6 +160,23 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // ── Discard a meeting started by mistake ────────────────────────────────────
+  // Soft-deletes an open `meeting` session so it's kept out of tracked time and
+  // no minutes are required. Owner (or admin) only, and only before minutes exist.
+  app.post<{ Params: { id: string } }>('/sessions/:id/discard', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const session = await prisma.session.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!session) return reply.code(404).send({ error: 'session_not_found' });
+    if (session.userId !== user.id && user.role !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    if (session.offTaskLabel !== 'meeting') return reply.code(400).send({ error: 'not_a_meeting' });
+    const hasMinutes = await prisma.meetingMinutes.findUnique({ where: { sessionId: session.id }, select: { id: true } });
+    if (hasMinutes) return reply.code(409).send({ error: 'minutes_exist' });
+    await prisma.session.update({ where: { id: session.id }, data: { deletedAt: new Date(), isOpen: false, endedAt: new Date() } });
+    req.log.info({ audit: 'meeting.discarded', sessionId: session.id, by: user.id }, 'audit');
+    return { ok: true };
+  });
+
   // ── Meeting minutes: record the MoM AND stop the meeting in one transaction ──
   // Only the person who ran the meeting may file it (they were there). All fields
   // are required; the session ends only once a valid MoM is stored.

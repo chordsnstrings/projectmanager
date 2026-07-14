@@ -834,6 +834,21 @@ describe('authed API integration', () => {
     await prisma.session.deleteMany({ where: { id: sid } });
   });
 
+  it('a meeting started by mistake can be discarded (no minutes)', async () => {
+    if (!available) return;
+    const start = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: devCookie }, payload: { offTaskLabel: 'meeting' } });
+    const sid = start.json().id;
+    // a non-meeting session can't use discard
+    const off = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: devCookie }, payload: { offTaskLabel: 'research' } });
+    expect((await app.inject({ method: 'POST', url: `/sessions/${off.json().id}/discard`, headers: { cookie: devCookie }, payload: {} })).statusCode).toBe(400);
+    // owner discards the meeting → soft-deleted, out of tracked time
+    expect((await app.inject({ method: 'POST', url: `/sessions/${sid}/discard`, headers: { cookie: devCookie }, payload: {} })).statusCode).toBe(200);
+    const gone = await prisma.session.findUnique({ where: { id: sid } });
+    expect(gone?.deletedAt).not.toBeNull();
+    expect(gone?.isOpen).toBe(false);
+    await prisma.session.deleteMany({ where: { id: { in: [sid, off.json().id] } } });
+  });
+
   it('questions attach to an off-task session (no task) and carry its label', async () => {
     if (!available) return;
     // dev runs an off-task "study" session — no task anywhere in sight
