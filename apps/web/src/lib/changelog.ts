@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.6',
+    date: '2026-07-14',
+    title: 'Tidier headers on mobile',
+    items: [
+      'Fixed the top bar on phones where buttons could pile up on top of the logo — the header now wraps to a neat second row with proper spacing, on both the work board and the dashboard.',
+    ],
+  },
+  {
     version: '2.0.5',
     date: '2026-07-14',
     title: 'Your board only asks your own questions',

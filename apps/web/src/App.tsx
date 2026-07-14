@@ -1080,15 +1080,15 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
   return (
     <Shell>
-      <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-14 flex items-center gap-x-3 gap-y-2 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0 shrink">
           <Logo size={22} />
           <span className="text-text3 font-mono text-xs truncate">
             {me.role === 'lead' ? 'lead' : 'admin'}
             {me.teamKey ? ` · ${me.teamKey}` : ''} · {me.githubLogin}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 ml-auto flex-wrap justify-end">
           <button
             onClick={() => navigate('/board')}
             className="btn btn-sm btn-ghost"

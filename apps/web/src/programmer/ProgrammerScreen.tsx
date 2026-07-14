@@ -341,8 +341,8 @@ export default function ProgrammerScreen({
   return (
     <div className="min-h-full text-text font-sans">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="sticky top-0 z-20 border-b border-hair bg-bg/85 backdrop-blur supports-[backdrop-filter]:bg-bg/70 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-14 flex items-center gap-x-3 gap-y-2 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
           <Logo size={20} />
           {onExitToDashboard && (
             <button
@@ -351,12 +351,14 @@ export default function ProgrammerScreen({
               className="btn btn-sm btn-ghost shrink-0"
               title="back to the team dashboard"
             >
-              ← Dashboard
+              <span className="sm:hidden" aria-hidden>←</span>
+              <span className="hidden sm:inline">← Dashboard</span>
+              <span className="sr-only sm:hidden">Dashboard</span>
             </button>
           )}
           <span className="hidden sm:inline text-sm font-medium text-text2 tracking-tightish truncate">{date}</span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-wrap justify-end">
           <button type="button" data-tour="myday" onClick={() => onOpenDay()} className="btn btn-sm btn-ghost" title="review your day timeline">
             My day
           </button>
