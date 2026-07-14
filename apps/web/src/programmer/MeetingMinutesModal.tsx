@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { MeetingMinutesItemDTO, SessionDTO } from '@cadence/shared';
 import { Logo } from '../components/Logo';
 import { useLockBodyScroll } from '../lib/useModal';
@@ -93,7 +94,9 @@ export default function MeetingMinutesModal({
     }
   };
 
-  return (
+  // Portal to <body>: the modal is rendered from inside a .card, whose
+  // backdrop-filter would otherwise trap position:fixed inside that card.
+  return createPortal(
     <div className="fixed inset-0 z-[60] grid place-items-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true">
       <div className="card w-full max-w-2xl p-6 sm:p-7 flex flex-col gap-5 max-h-[90vh] overflow-y-auto animate-scale-in">
         <header className="flex items-center gap-3">
@@ -188,6 +191,7 @@ export default function MeetingMinutesModal({
           )}
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
