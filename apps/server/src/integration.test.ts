@@ -676,6 +676,39 @@ describe('authed API integration', () => {
     await prisma.user.deleteMany({ where: { id: { in: [leadA.id, leadB.id, devA.id, devB.id] } } });
   });
 
+  it('stop session: own-team lead can stop a member; cross-team is forbidden', async () => {
+    if (!available) return;
+    const { seedTeams } = await import('./scripts/seed-teams');
+    await seedTeams(prisma);
+    const prog = await prisma.team.findUniqueOrThrow({ where: { key: 'programming' } });
+    const mkt = await prisma.team.findUniqueOrThrow({ where: { key: 'marketing' } });
+    const mk = (role: string, teamId: string, p: string) =>
+      prisma.user.create({ data: { githubId: BigInt(uniq()), githubLogin: `${p}_${uniq()}`, role, teamId } });
+    const leadA = await mk('lead', prog.id, 'stopLeadA');
+    const leadB = await mk('lead', mkt.id, 'stopLeadB');
+    const devA = await mk('dev', prog.id, 'stopDevA');
+    // @ts-expect-error signCookie decorated by @fastify/cookie
+    const ck = (id: string) => `cad_session=${app.signCookie(id)}`;
+
+    const startFor = async (id: string) => {
+      const r = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: ck(id) }, payload: { offTaskLabel: 'study' } });
+      return r.json().id as string;
+    };
+
+    // a lead on another team cannot stop devA's session
+    const s1 = await startFor(devA.id);
+    const cross = await app.inject({ method: 'POST', url: `/sessions/${s1}/stop`, headers: { cookie: ck(leadB.id) }, payload: {} });
+    expect(cross.statusCode).toBe(403);
+
+    // devA's own team lead can stop it
+    const own = await app.inject({ method: 'POST', url: `/sessions/${s1}/stop`, headers: { cookie: ck(leadA.id) }, payload: {} });
+    expect(own.statusCode).toBe(200);
+    expect(own.json().isOpen).toBe(false);
+
+    await prisma.session.deleteMany({ where: { userId: devA.id } });
+    await prisma.user.deleteMany({ where: { id: { in: [leadA.id, leadB.id, devA.id] } } });
+  });
+
   it('daily check-in: prompt → submit (once/day) → admin pulse aggregates', async () => {
     if (!available) return;
     const { seedTeams } = await import('./scripts/seed-teams');

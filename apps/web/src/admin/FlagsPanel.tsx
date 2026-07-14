@@ -10,8 +10,16 @@ export interface FlagsPanelProps {
   onResolve: (id: string) => void;
   onDismiss: (id: string) => void;
   onAsk: (flag: FlagDTO, body: string) => void;
+  /** Stop the running session a live-timer flag points at (idle / long-open). */
+  onStopSession?: (flag: FlagDTO) => void;
   onOpenUser?: (userId: string, iso?: string | null) => void;
 }
+
+/** Flags that hang on a still-running session — stoppable in one tap. */
+const LIVE_SESSION_FLAGS: ReadonlySet<FlagDTO['type']> = new Set([
+  'open_no_activity',
+  'long_open_session',
+]);
 
 const TYPE_LABEL: Record<FlagDTO['type'], string> = {
   open_no_activity: 'open · no activity',
@@ -47,17 +55,20 @@ function FlagRow({
   onResolve,
   onDismiss,
   onAsk,
+  onStopSession,
   onOpenUser,
 }: {
   flag: FlagDTO;
   onResolve: (id: string) => void;
   onDismiss: (id: string) => void;
   onAsk: (flag: FlagDTO, body: string) => void;
+  onStopSession?: (flag: FlagDTO) => void;
   onOpenUser?: (userId: string, iso?: string | null) => void;
 }) {
   const [asking, setAsking] = useState(false);
   const [body, setBody] = useState('');
   const canAsk = flag.taskId != null;
+  const canStop = onStopSession != null && flag.sessionId != null && LIVE_SESSION_FLAGS.has(flag.type);
 
   function send() {
     const trimmed = body.trim();
@@ -101,6 +112,16 @@ function FlagRow({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          {canStop ? (
+            <button
+              type="button"
+              onClick={() => onStopSession?.(flag)}
+              title="End this running session now"
+              className={btn('border-danger/40 bg-danger/10 text-danger hover:bg-danger/20')}
+            >
+              Stop session
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => onResolve(flag.id)}
@@ -167,7 +188,7 @@ function FlagRow({
   );
 }
 
-export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onOpenUser, hasMore = false, onLoadMore }: FlagsPanelProps) {
+export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onStopSession, onOpenUser, hasMore = false, onLoadMore }: FlagsPanelProps) {
   return (
     <section className="card overflow-hidden animate-fade-in">
       <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
@@ -191,6 +212,7 @@ export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onOpenU
               onResolve={onResolve}
               onDismiss={onDismiss}
               onAsk={onAsk}
+              onStopSession={onStopSession}
               onOpenUser={onOpenUser}
             />
           ))}

@@ -956,6 +956,40 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     },
     [loadFlags],
   );
+  // Stop the running session an idle/long-open flag points at, then resolve the
+  // flag. A live meeting can't be force-stopped (its runner must file minutes).
+  const onStopSession = useCallback(
+    async (flag: FlagDTO) => {
+      if (!flag.sessionId) return;
+      const who = flag.userLogin ? `@${flag.userLogin}` : 'this dev';
+      if (
+        !(await confirmDialog({
+          title: 'Stop this session?',
+          body: `${who}’s timer will end now. This is cleanup for an idle session — it doesn’t delete tracked time.`,
+          confirmLabel: 'Stop session',
+          danger: true,
+        }))
+      )
+        return;
+      try {
+        await api<SessionDTO>(`/sessions/${flag.sessionId}/stop`, { method: 'POST', body: '{}' });
+        await api(`/flags/${flag.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'resolved' }) });
+        toast('Session stopped', 'success');
+      } catch (e) {
+        if (isMeetingGate(e)) {
+          toast('That’s a meeting — only its runner can end it (minutes required)', 'info');
+        } else if (e instanceof ApiError && e.status === 404) {
+          // Already stopped elsewhere — the flag is stale; clear it.
+          await api(`/flags/${flag.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'resolved' }) }).catch(() => {});
+          toast('Session was already stopped', 'info');
+        } else {
+          toast('Couldn’t stop the session', 'error');
+        }
+      }
+      void loadFlags();
+    },
+    [loadFlags],
+  );
   const onAsk = useCallback(
     (flag: FlagDTO, body: string) => {
       // A question needs a task OR a session to hang on (off-task flags have no task).
@@ -1083,7 +1117,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
       <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
         {tab === 'flags' ? (
-          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onOpenUser={openUserDay} hasMore={flagsCursor != null} onLoadMore={loadMoreFlags} />
+          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onStopSession={onStopSession} onOpenUser={openUserDay} hasMore={flagsCursor != null} onLoadMore={loadMoreFlags} />
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
         ) : tab === 'pulse' ? (

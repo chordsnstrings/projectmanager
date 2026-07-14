@@ -10,7 +10,7 @@ import type {
   StopSessionBody,
 } from '@cadence/shared';
 import { activityKeysFor } from '@cadence/shared';
-import { requireUser } from '../auth/require';
+import { assertCanViewUser, requireUser } from '../auth/require';
 import { sessionToDTO } from '../services/map';
 import { decryptToken } from '../auth/tokenCrypto';
 import { syncRunningSessionCommits } from '../github/userSync';
@@ -107,9 +107,11 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         where: { id: req.params.id, deletedAt: null },
       });
       if (!session) return reply.code(404).send({ error: 'session_not_found' });
-      // Owner stops their own; an admin may stop anyone's (cleanup).
-      if (session.userId !== user.id && user.role !== 'admin') {
-        return reply.code(403).send({ error: 'forbidden' });
+      // Owner stops their own; a manager may stop a session they can see —
+      // admin anyone, lead their own team (cleanup of idle/stale timers, e.g.
+      // from an open_no_activity flag). assertCanViewUser sends 403 otherwise.
+      if (session.userId !== user.id) {
+        if (!(await assertCanViewUser(user, session.userId, reply))) return;
       }
 
       const { summary, blocked, markTaskDone } = req.body ?? {};

@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.3',
+    date: '2026-07-14',
+    title: 'Stop idle sessions from a flag',
+    items: [
+      'An idle or long-open session flag now has a “Stop session” button — end the stray timer in one tap and the flag clears itself.',
+      'Team leads can now stop a running session for anyone on their team (not just admins).',
+    ],
+  },
+  {
     version: '2.0.2',
     date: '2026-07-14',
     title: 'Ending a meeting',
