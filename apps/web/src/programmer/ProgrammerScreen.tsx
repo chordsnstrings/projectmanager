@@ -51,7 +51,7 @@ export interface ProgrammerScreenProps {
   /** more pages of tasks exist server-side */
   moreTasks?: boolean;
   onLoadMoreTasks?: () => void;
-  onStop?: (sessionId: string) => void;
+  onStop?: (sessionId: string) => void | Promise<void>;
   onOverrideActivity?: (sessionId: string, activity: ActivityType) => void;
   onSaveSummary?: (
     sessionId: string,
@@ -67,6 +67,8 @@ export interface ProgrammerScreenProps {
   meId?: string;
   onMarkDone?: (taskId: string) => void | Promise<void>;
   syncing?: boolean;
+  /** open task sessions (id/title/startedAt) — a reliable top-of-board stop */
+  runningTasks?: { id: string; title: string; startedAt: string }[];
   /** running off-task sessions (no task row to control them from) */
   offTaskRunning?: SessionDTO[];
   /** stop a session directly (no wrap-up panel) — used for off-task */
@@ -148,6 +150,7 @@ function NudgeBanner({
           <div className="flex items-center gap-2">
             <input
               autoFocus
+              autoComplete="off"
               value={intent}
               maxLength={300}
               onChange={(e) => setIntent(e.target.value)}
@@ -232,6 +235,41 @@ function OffTaskRow({
   );
 }
 
+function RunningTaskRow({
+  row,
+  onStop,
+}: {
+  row: { id: string; title: string; startedAt: string };
+  onStop: (sessionId: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-hair last:border-b-0">
+      <span className="w-1.5 h-1.5 rounded-full bg-brass shrink-0 animate-pulse" aria-hidden />
+      <span className="text-sm text-text flex-1 truncate tracking-tightish">{row.title}</span>
+      <RunningTimer startedAt={row.startedAt} />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          if (busy) return;
+          setBusy(true);
+          try {
+            await onStop(row.id);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-danger/40 text-danger hover:bg-danger/10 transition-colors disabled:opacity-60"
+        title="stop session"
+        aria-label={`stop ${row.title}`}
+      >
+        {busy ? <span className="animate-spin text-xs leading-none" aria-hidden>◌</span> : <span className="text-xs leading-none">■</span>}
+      </button>
+    </div>
+  );
+}
+
 function ProdStat({ label, value, tone = 'text-text' }: { label: string; value: string; tone?: string }) {
   return (
     <div>
@@ -268,6 +306,7 @@ export default function ProgrammerScreen({
   meId,
   onMarkDone = noop,
   syncing = false,
+  runningTasks = [],
   offTaskRunning = [],
   onStopOffTask = noop,
   onStopMeeting = async () => {},
@@ -340,6 +379,17 @@ export default function ProgrammerScreen({
             <ProdStat label="7d · active" value={fmtDuration(productivity.week.activeMinutes)} />
             <ProdStat label="7d · done" value={String(productivity.week.completed)} tone="text-success" />
           </button>
+        )}
+
+        {/* Running now — always-reachable stop for every open task session, even
+            if its row is scrolled away, filtered, or covered by another panel. */}
+        {runningTasks.length > 0 && (
+          <div className="card overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-hair label">running now · {runningTasks.length}</div>
+            {runningTasks.map((r) => (
+              <RunningTaskRow key={r.id} row={r} onStop={onStop} />
+            ))}
+          </div>
         )}
 
         {/* Open questions the dev must answer (gates next completion) */}

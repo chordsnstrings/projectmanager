@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.1',
+    date: '2026-07-14',
+    title: 'Always stoppable',
+    items: [
+      'New “Running now” bar at the top of your board — stop any running task in one tap, even if its row is scrolled away or covered.',
+      'Fixed the phone keyboard’s autofill suggestions covering the task list.',
+    ],
+  },
+  {
     version: '2.0',
     date: '2026-07-08',
     title: 'Schedule meetings',

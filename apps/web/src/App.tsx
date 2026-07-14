@@ -601,6 +601,13 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const sessionsByTask: Record<string, TaskSessionState> = {};
   for (const s of active) if (s.taskId) sessionsByTask[s.taskId] = { state: 'running', session: s };
 
+  // Every open task-session, with a resolved title — the "running now" bar uses
+  // this so a session is always stoppable even if its row isn't in view.
+  const taskTitleById = new Map([...tasks, ...pool].map((t) => [t.id, t.title]));
+  const runningTasks = active
+    .filter((s) => s.taskId && s.isOpen)
+    .map((s) => ({ id: s.id, title: taskTitleById.get(s.taskId as string) ?? s.intent ?? 'task', startedAt: s.startedAt }));
+
   const nudge = nudges.find((n) => !dismissed.has(n.id)) ?? null;
   const syncedAgo = lastSync ? relativeTime(new Date(lastSync).toISOString()) : 'never';
 
@@ -640,6 +647,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onRefresh={doSync}
         onRename={onRename}
         onSignOut={signOut}
+        runningTasks={runningTasks}
         offTaskRunning={active.filter((s) => !s.taskId && s.isOpen)}
         onStopOffTask={onStopOffTask}
         onStopMeeting={onStopMeeting}

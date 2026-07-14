@@ -279,6 +279,7 @@ export default function TaskRow({
           <div className="flex items-center gap-2">
             <input
               autoFocus
+              autoComplete="off"
               value={intentText}
               maxLength={300}
               onChange={(e) => setIntentText(e.target.value)}
@@ -464,6 +465,7 @@ function WrapPanel({
       {/* editable one-line draft summary */}
       <input
         value={summary}
+        autoComplete="off"
         onChange={(e) => setSummary(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && save()}
         placeholder="one-line summary…"
