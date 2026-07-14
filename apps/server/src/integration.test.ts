@@ -927,6 +927,36 @@ describe('authed API integration', () => {
     await prisma.session.deleteMany({ where: { id: sessionId } });
   });
 
+  it('questions: ?mine=1 scopes a manager to their own queue (not team-wide)', async () => {
+    if (!available) return;
+    // admin raises a question FOR the dev
+    const s = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: devCookie }, payload: { offTaskLabel: 'study' } });
+    const sessionId = s.json().id;
+    const q = await app.inject({
+      method: 'POST',
+      url: '/questions',
+      headers: { cookie: adminCookie },
+      payload: { targetUserId: devId, sessionId, body: 'what are you studying?', blocksNext: true },
+    });
+    expect(q.statusCode).toBe(201);
+    const qid = q.json().id;
+
+    // admin's TEAM queue (no mine) includes it — it's a question they must track
+    const teamQ = await app.inject({ method: 'GET', url: '/questions?status=open', headers: { cookie: adminCookie } });
+    expect(teamQ.json().some((x: { id: string }) => x.id === qid)).toBe(true);
+
+    // admin's PERSONAL board (mine=1) must NOT — they raised it, they don't answer it
+    const adminMine = await app.inject({ method: 'GET', url: '/questions?status=open&mine=1', headers: { cookie: adminCookie } });
+    expect(adminMine.json().some((x: { id: string }) => x.id === qid)).toBe(false);
+
+    // the dev it targets sees it on their own board
+    const devMine = await app.inject({ method: 'GET', url: '/questions?status=open&mine=1', headers: { cookie: devCookie } });
+    expect(devMine.json().some((x: { id: string }) => x.id === qid)).toBe(true);
+
+    await prisma.question.deleteMany({ where: { id: qid } });
+    await prisma.session.deleteMany({ where: { id: sessionId } });
+  });
+
   it('walkthrough: tourSeen starts false and flips after /me/tour-seen', async () => {
     if (!available) return;
     const me0 = await app.inject({ method: 'GET', url: '/me', headers: { cookie: devCookie } });

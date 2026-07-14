@@ -253,7 +253,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       api<Paginated<TaskDTO>>('/tasks').catch(() => ({ items: [] as TaskDTO[], nextCursor: null })),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
-      api<QuestionDTO[]>('/questions?status=open').catch(() => [] as QuestionDTO[]),
+      api<QuestionDTO[]>('/questions?status=open&mine=1').catch(() => [] as QuestionDTO[]),
       api<ProductivityDTO>('/me/productivity').catch(() => null),
       api<Paginated<TaskDTO>>('/tasks/pool').then((p) => p.items).catch(() => [] as TaskDTO[]),
       api<MeetingDTO[]>('/me/meetings').catch(() => [] as MeetingDTO[]),

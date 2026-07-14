@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.0.5',
+    date: '2026-07-14',
+    title: 'Your board only asks your own questions',
+    items: [
+      'Fixed the work board showing managers questions they had raised for other people as if they needed answering — it now shows only questions actually addressed to you.',
+    ],
+  },
+  {
     version: '2.0.4',
     date: '2026-07-14',
     title: 'Admins & leads can track their own work',

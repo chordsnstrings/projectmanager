@@ -153,12 +153,17 @@ export async function questionRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Queue: owner all; lead own team; member own.
-  app.get<{ Querystring: { status?: string } }>('/questions', async (req, reply) => {
+  // `mine=1` forces target-self scope regardless of role — the personal work
+  // board uses this so a manager sees only questions *they* must answer, not
+  // the whole team queue (which they raise for others).
+  app.get<{ Querystring: { status?: string; mine?: string } }>('/questions', async (req, reply) => {
     const user = await requireUser(req, reply);
     if (!user) return;
     const status = req.query.status as 'open' | 'answered' | undefined;
-    const scopeWhere =
-      user.role === 'admin'
+    const mine = req.query.mine === '1' || req.query.mine === 'true';
+    const scopeWhere = mine
+      ? { targetUserId: user.id }
+      : user.role === 'admin'
         ? {}
         : user.role === 'lead'
           ? { targetUser: { teamId: user.teamId ?? '__no_team__' } }
