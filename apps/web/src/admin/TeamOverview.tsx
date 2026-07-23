@@ -1,5 +1,7 @@
+import { useMemo, useState } from 'react';
 import type { TeamDashboard, TeamMemberRollup } from '@cadence/shared';
 import { fmtClock, fmtDuration, relativeTime } from '../lib/format';
+import SearchInput from '../components/SearchInput';
 
 export interface TeamOverviewProps {
   data: TeamDashboard;
@@ -59,25 +61,45 @@ function Stat({
 }
 
 export default function TeamOverview({ data, onSelectUser = noop }: TeamOverviewProps) {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const members = useMemo(
+    () =>
+      q
+        ? data.members.filter(
+            (m) =>
+              m.githubLogin.toLowerCase().includes(q) ||
+              (m.name ?? '').toLowerCase().includes(q),
+          )
+        : data.members,
+    [data.members, q],
+  );
+
   return (
     <section className="card overflow-hidden animate-fade-in">
-      <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
+      <header className="px-4 sm:px-5 py-3 border-b border-hair flex items-center gap-3 flex-wrap">
         <h2 className="text-sm font-semibold text-text tracking-tightish">Team</h2>
-        <span className="font-mono text-xs text-text3">
-          {fmtClock(data.rangeStart)}–{fmtClock(data.rangeEnd)}
+        {data.members.length > 3 && (
+          <SearchInput value={query} onChange={setQuery} placeholder="Filter people…" className="w-40 sm:w-52" />
+        )}
+        <span className="font-mono text-xs text-text3 ml-auto">
+          {q ? `${members.length}/${data.members.length}` : `${fmtClock(data.rangeStart)}–${fmtClock(data.rangeEnd)}`}
         </span>
       </header>
 
       <div role="table" aria-label="team overview">
         {data.members.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-text3">No activity in range.</div>
+        ) : members.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-text3 animate-fade-in">No one matches “{query}”.</div>
         ) : (
-          data.members.map((m) => (
+          members.map((m, i) => (
             <button
               key={m.userId}
               type="button"
               onClick={() => onSelectUser(m.userId)}
-              className="group w-full text-left border-b border-hair last:border-b-0 px-4 sm:px-5 py-3.5 hover:bg-surface/50 focus:outline-none focus:bg-surface/50 transition-colors"
+              style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}
+              className="group w-full text-left border-b border-hair last:border-b-0 px-4 sm:px-5 py-3.5 hover:bg-surface/50 focus:outline-none focus:bg-surface/50 transition-colors animate-fade-in"
             >
               <div className="flex items-center gap-3">
                 <Avatar member={m} />

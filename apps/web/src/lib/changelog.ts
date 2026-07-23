@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.1.1',
+    date: '2026-07-14',
+    title: 'Search the team & livelier numbers',
+    items: [
+      'Filter the People roster instantly with a new search box — type a name or GitHub handle.',
+      'Your board’s active/done tallies now count up when they change, so progress feels alive; rows ease in as they load.',
+    ],
+  },
+  {
     version: '2.1',
     date: '2026-07-14',
     title: 'Clear all your flags at once',

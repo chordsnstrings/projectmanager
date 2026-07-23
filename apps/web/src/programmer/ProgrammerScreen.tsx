@@ -10,6 +10,7 @@ import type {
   TaskDTO,
 } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
+import { useCountUp } from '../lib/useCountUp';
 import TaskRow, { type TaskRowState } from './TaskRow';
 import { Logo } from '../components/Logo';
 import InstallButton from '../components/InstallButton';
@@ -284,11 +285,22 @@ function RunningTaskRow({
   );
 }
 
-function ProdStat({ label, value, tone = 'text-text' }: { label: string; value: string; tone?: string }) {
+function ProdStat({
+  label,
+  value,
+  format = String,
+  tone = 'text-text',
+}: {
+  label: string;
+  value: number;
+  format?: (n: number) => string;
+  tone?: string;
+}) {
+  const n = useCountUp(value);
   return (
     <div>
       <div className="label">{label}</div>
-      <div className={`font-mono text-base mt-0.5 ${tone}`}>{value}</div>
+      <div className={`font-mono text-base mt-0.5 tabular-nums ${tone}`}>{format(n)}</div>
     </div>
   );
 }
@@ -402,10 +414,10 @@ export default function ProgrammerScreen({
             className="card px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-left hover:bg-surface/40 transition-colors"
             title="open your progress"
           >
-            <ProdStat label="today · active" value={fmtDuration(productivity.today.activeMinutes)} />
-            <ProdStat label="today · done" value={String(productivity.today.completed)} tone="text-success" />
-            <ProdStat label="7d · active" value={fmtDuration(productivity.week.activeMinutes)} />
-            <ProdStat label="7d · done" value={String(productivity.week.completed)} tone="text-success" />
+            <ProdStat label="today · active" value={productivity.today.activeMinutes} format={fmtDuration} />
+            <ProdStat label="today · done" value={productivity.today.completed} tone="text-success" />
+            <ProdStat label="7d · active" value={productivity.week.activeMinutes} format={fmtDuration} />
+            <ProdStat label="7d · done" value={productivity.week.completed} tone="text-success" />
           </button>
         )}
 
