@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.1',
+    date: '2026-07-14',
+    title: 'Smoother, lighter loading',
+    items: [
+      'Long lists now load the next page as you scroll — no more tapping “show more”.',
+      'The app starts faster: heavy timeline and chart views load only when you open them.',
+    ],
+  },
+  {
     version: '2.2',
     date: '2026-07-14',
     title: 'Momentum — level up your work',
