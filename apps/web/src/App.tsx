@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ActivityType,
   DayTimeline as DayTimelineDTO,
@@ -45,9 +45,6 @@ import ConfirmDialogHost, { confirmDialog } from './components/ConfirmDialog';
 import ProgrammerScreen, { type TaskSessionState } from './programmer/ProgrammerScreen';
 import MeetingMinutesModal from './programmer/MeetingMinutesModal';
 import TeamOverview from './admin/TeamOverview';
-import TeamDay from './admin/TeamDay';
-import DayTimeline from './admin/DayTimeline';
-import Trends from './admin/Trends';
 import ProgressView from './admin/ProgressView';
 import CompletionLog from './admin/CompletionLog';
 import TasksPanel from './admin/TasksPanel';
@@ -56,8 +53,12 @@ import AskAboutTask from './admin/AskAboutTask';
 import SendDigestButton from './admin/SendDigestButton';
 import RunLoginCheckButton from './admin/RunLoginCheckButton';
 import QuestionsPanel from './admin/QuestionsPanel';
-import PulsePanel from './admin/PulsePanel';
 import MeetingsPanel from './admin/MeetingsPanel';
+// Heavy, chart/timeline-laden views — code-split so they load only when opened.
+const TeamDay = lazy(() => import('./admin/TeamDay'));
+const DayTimeline = lazy(() => import('./admin/DayTimeline'));
+const Trends = lazy(() => import('./admin/Trends'));
+const PulsePanel = lazy(() => import('./admin/PulsePanel'));
 
 type AuthState = { kind: 'loading' } | { kind: 'anon' } | { kind: 'authed'; me: Me };
 
@@ -627,7 +628,9 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
           {view === 'day' ? (
             day ? (
               <>
-                <DayTimeline data={day} onCreateTaskFromItem={onCreateTaskFromItem} />
+                <Suspense fallback={<ListSkeleton rows={4} />}>
+                  <DayTimeline data={day} onCreateTaskFromItem={onCreateTaskFromItem} />
+                </Suspense>
                 <p className="text-center font-mono text-[11px] text-text3">
                   active = real time worked (overlaps counted once) · task hrs = effort across tasks
                 </p>
@@ -1170,7 +1173,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
         ) : tab === 'pulse' ? (
-          <PulsePanel data={pulse} />
+          <Suspense fallback={<ListSkeleton rows={5} />}>
+            <PulsePanel data={pulse} />
+          </Suspense>
         ) : tab === 'meetings' ? (
           <MeetingsPanel meetings={meetings} roster={roster} onCreate={onCreateMeeting} onCancel={onCancelMeeting} />
         ) : tab === 'tasks' ? (
@@ -1230,7 +1235,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
             </div>
             {personView === 'day' ? (
               day ? (
-                <DayTimeline data={day} onAskQuestion={onAskQuestion} onCreateTaskFromItem={onCreateTaskFromItem} />
+                <Suspense fallback={<ListSkeleton rows={4} />}>
+                  <DayTimeline data={day} onAskQuestion={onAskQuestion} onCreateTaskFromItem={onCreateTaskFromItem} />
+                </Suspense>
               ) : (
                 <Loading>loading day…</Loading>
               )
@@ -1244,7 +1251,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
                 <Loading>loading progress…</Loading>
               )
             ) : trends ? (
-              <Trends data={trends} />
+              <Suspense fallback={<ListSkeleton rows={5} />}>
+                <Trends data={trends} />
+              </Suspense>
             ) : (
               <Loading>loading trends…</Loading>
             )}
@@ -1279,7 +1288,9 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
             </div>
             {teamView === 'day' ? (
               teamDay ? (
-                <TeamDay data={teamDay} onSelectUser={selectUser} />
+                <Suspense fallback={<ListSkeleton rows={5} />}>
+                  <TeamDay data={teamDay} onSelectUser={selectUser} />
+                </Suspense>
               ) : (
                 <ListSkeleton rows={5} />
               )

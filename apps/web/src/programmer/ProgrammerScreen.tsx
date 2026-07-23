@@ -11,6 +11,7 @@ import type {
 } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
 import { useCountUp } from '../lib/useCountUp';
+import { useInfiniteScroll } from '../lib/useInfiniteScroll';
 import MomentumCard from './MomentumCard';
 import type { MomentumDTO } from '@cadence/shared';
 import TaskRow, { type TaskRowState } from './TaskRow';
@@ -354,6 +355,7 @@ export default function ProgrammerScreen({
   productivity = null,
   momentum = null,
 }: ProgrammerScreenProps) {
+  const moreTasksSentinel = useInfiniteScroll(onLoadMoreTasks, moreTasks);
   return (
     <div className="min-h-full text-text font-sans">
       {/* Header */}
@@ -524,6 +526,7 @@ export default function ProgrammerScreen({
           )}
           {moreTasks && (
             <button
+              ref={moreTasksSentinel}
               type="button"
               onClick={() => onLoadMoreTasks()}
               className="w-full py-3 font-mono text-[11px] text-text3 hover:text-text2 hover:bg-surface/40 transition-colors border-t border-hair"

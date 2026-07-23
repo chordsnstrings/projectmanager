@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FlagDTO } from '@cadence/shared';
 import { relativeTime } from '../lib/format';
+import { useInfiniteScroll } from '../lib/useInfiniteScroll';
 
 export interface FlagsPanelProps {
   /** another page exists server-side */
@@ -271,6 +272,7 @@ function BulkBar({ count, onBulk }: { count: number; onBulk: NonNullable<FlagsPa
 }
 
 export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onStopSession, onBulk, onOpenUser, hasMore = false, onLoadMore }: FlagsPanelProps) {
+  const sentinel = useInfiniteScroll(onLoadMore, hasMore);
   return (
     <section className="card overflow-hidden animate-fade-in">
       <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
@@ -303,6 +305,7 @@ export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onStopS
       )}
       {hasMore && (
         <button
+          ref={sentinel}
           type="button"
           onClick={() => onLoadMore?.()}
           className="w-full py-3 font-mono text-[11px] text-text3 hover:text-text2 hover:bg-surface/40 transition-colors border-t border-hair"

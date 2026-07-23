@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ManagedTask, MemberLite, RepoLite, TaskReadiness, TaskStatus } from '@cadence/shared';
 import { api, ApiError } from '../lib/api';
 import { fmtDuration } from '../lib/format';
+import { useInfiniteScroll } from '../lib/useInfiniteScroll';
 import TaskDiscussion from '../components/TaskDiscussion';
 import { confirmDialog } from '../components/ConfirmDialog';
 import { toast } from '../components/Toasts';
@@ -496,6 +497,7 @@ export default function TasksPanel({
   onLoadMore?: () => void;
 }) {
   const [creating, setCreating] = useState(false);
+  const sentinel = useInfiniteScroll(onLoadMore, hasMore);
 
   return (
     <section className="flex flex-col gap-4 animate-fade-in">
@@ -522,6 +524,7 @@ export default function TasksPanel({
           {hasMore && (
             <li>
               <button
+                ref={sentinel}
                 type="button"
                 onClick={() => onLoadMore?.()}
                 className="w-full py-3 font-mono text-[11px] text-text3 hover:text-text2 hover:bg-surface/40 transition-colors border-t border-hair"

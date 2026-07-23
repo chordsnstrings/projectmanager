@@ -16,6 +16,8 @@ function Avatar({ member }: { member: TeamMemberRollup }) {
       <img
         src={member.avatarUrl}
         alt=""
+        loading="lazy"
+        decoding="async"
         className="w-6 h-6 rounded-full border border-hair shrink-0"
       />
     );
