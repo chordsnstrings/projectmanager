@@ -10,6 +10,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2',
+    date: '2026-07-14',
+    title: 'Momentum — level up your work',
+    items: [
+      'New Momentum card on your board: earn XP for real outcomes (tasks completed, questions answered, minutes filed, daily check-ins), level up, and keep your activity streak alive.',
+      'Unlock badges as you go — “First ship”, “Closer”, “On a roll”, “Relentless”, and more. It’s personal and private: no leaderboards, and it rewards shipping, not hours logged.',
+    ],
+  },
+  {
     version: '2.1.1',
     date: '2026-07-14',
     title: 'Search the team & livelier numbers',

@@ -15,6 +15,7 @@ import type {
   Trends as TrendsDTO,
   Progress as ProgressDTO,
   Productivity as ProductivityDTO,
+  MomentumDTO,
   ManagedTask as ManagedTaskDTO,
   MemberLite as MemberLiteDTO,
   RepoLite as RepoLiteDTO,
@@ -238,6 +239,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [day, setDay] = useState<DayTimelineDTO | null>(null);
   const [productivity, setProductivity] = useState<ProductivityDTO | null>(null);
+  const [momentum, setMomentum] = useState<MomentumDTO | null>(null);
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [pool, setPool] = useState<TaskDTO[]>([]);
   const [tasksCursor, setTasksCursor] = useState<string | null>(null);
@@ -249,7 +251,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
   const [lastSync, setLastSync] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, a, n, q, prod, pl, mtg] = await Promise.all([
+    const [t, a, n, q, prod, pl, mtg, mom] = await Promise.all([
       api<Paginated<TaskDTO>>('/tasks').catch(() => ({ items: [] as TaskDTO[], nextCursor: null })),
       api<SessionDTO[]>('/sessions/active').catch(() => [] as SessionDTO[]),
       api<NudgeDTO[]>('/nudges').catch(() => [] as NudgeDTO[]),
@@ -257,6 +259,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       api<ProductivityDTO>('/me/productivity').catch(() => null),
       api<Paginated<TaskDTO>>('/tasks/pool').then((p) => p.items).catch(() => [] as TaskDTO[]),
       api<MeetingDTO[]>('/me/meetings').catch(() => [] as MeetingDTO[]),
+      api<MomentumDTO>('/me/momentum').catch(() => null),
     ]);
     setTasks(t.items);
     setTasksCursor(t.nextCursor);
@@ -266,6 +269,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
     setProductivity(prod);
     setPool(pl);
     setMyMeetings(mtg);
+    setMomentum(mom);
     setLoaded(true);
   }, []);
 
@@ -663,6 +667,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onOpenDay={() => navigate('/board/day')}
         onOpenProgress={() => navigate('/board/progress')}
         productivity={productivity}
+        momentum={momentum}
         activityKeys={activityKeysFor(me.teamKey)}
         teamKey={me.teamKey}
         pool={pool}

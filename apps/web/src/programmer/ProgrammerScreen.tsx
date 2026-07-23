@@ -11,6 +11,8 @@ import type {
 } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
 import { useCountUp } from '../lib/useCountUp';
+import MomentumCard from './MomentumCard';
+import type { MomentumDTO } from '@cadence/shared';
 import TaskRow, { type TaskRowState } from './TaskRow';
 import { Logo } from '../components/Logo';
 import InstallButton from '../components/InstallButton';
@@ -97,6 +99,7 @@ export interface ProgrammerScreenProps {
   onOpenProgress?: () => void;
   /** today + this-week productivity summary for the board strip */
   productivity?: Productivity | null;
+  momentum?: MomentumDTO | null;
 }
 
 function RunningTimer({ startedAt }: { startedAt: string }) {
@@ -349,6 +352,7 @@ export default function ProgrammerScreen({
   onOpenDay = noop,
   onOpenProgress = noop,
   productivity = null,
+  momentum = null,
 }: ProgrammerScreenProps) {
   return (
     <div className="min-h-full text-text font-sans">
@@ -420,6 +424,9 @@ export default function ProgrammerScreen({
             <ProdStat label="7d · done" value={productivity.week.completed} tone="text-success" />
           </button>
         )}
+
+        {/* Momentum — personal level, streak & badges (private, non-competitive) */}
+        <MomentumCard momentum={momentum} />
 
         {/* Running now — always-reachable stop for every open task session, even
             if its row is scrolled away, filtered, or covered by another panel. */}

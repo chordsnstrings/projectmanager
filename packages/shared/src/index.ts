@@ -472,6 +472,33 @@ export interface Productivity {
   week: ProductivityWindow; // last 7 local days incl. today
 }
 
+// ── Momentum (personal, non-competitive gamification) ───────────────────────
+export interface MomentumBadge {
+  id: string;
+  label: string;
+  description: string;
+  earned: boolean;
+  progress: number; // current count toward the goal
+  goal: number;
+}
+export interface MomentumDTO {
+  xp: number;
+  level: number;
+  xpIntoLevel: number; // xp accumulated within the current level
+  xpForLevel: number; // xp span of the current level (into/for = % to next)
+  nextLevelXp: number; // total xp needed to reach the next level
+  streakDays: number; // current consecutive active days (ending today/yesterday)
+  bestStreakDays: number;
+  checkinStreakDays: number;
+  totals: {
+    tasksCompleted: number;
+    questionsAnswered: number;
+    minutesFiled: number; // meeting-minutes filed
+    checkins: number;
+  };
+  badges: MomentumBadge[];
+}
+
 export interface ProgressPoint {
   weekStart: string;
   completed: number;

@@ -307,6 +307,25 @@ describe('authed API integration', () => {
     await prisma.flag.deleteMany({ where: { type: 'long_open_session', userId: devId, detail: 'resurrection test' } });
   });
 
+  it('momentum: XP, level and badges reflect real outcomes (self-only)', async () => {
+    if (!available) return;
+    const get = async () =>
+      (await app.inject({ method: 'GET', url: '/me/momentum', headers: { cookie: devCookie } })).json();
+    const before = await get();
+    expect(before.level).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(before.badges)).toBe(true);
+
+    const task = await prisma.task.create({
+      data: { source: 'manual', title: 'momentum task', assigneeUserId: devId, status: 'done', closedAt: new Date() },
+    });
+    const after = await get();
+    expect(after.xp).toBeGreaterThanOrEqual(before.xp + 50); // +50 XP per completed task
+    expect(after.totals.tasksCompleted).toBe(before.totals.tasksCompleted + 1);
+    expect(after.badges.find((b: { id: string }) => b.id === 'first_ship').earned).toBe(true);
+
+    await prisma.task.delete({ where: { id: task.id } });
+  });
+
   it('activity-check requires the bearer token and reports per-user state', async () => {
     if (!available) return;
     const noAuth = await app.inject({ method: 'GET', url: '/api/integrations/activity' });

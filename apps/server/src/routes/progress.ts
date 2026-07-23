@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import { prisma } from '@cadence/db';
 import { assertCanViewUser, requireUser } from '../auth/require';
 import { buildProductivity, buildProgress, listCompletions } from '../services/progress';
+import { buildMomentum } from '../services/momentum';
 
 export async function progressRoutes(app: FastifyInstance): Promise<void> {
   // Board summary for the signed-in dev (today + last 7 days).
@@ -8,6 +10,14 @@ export async function progressRoutes(app: FastifyInstance): Promise<void> {
     const user = await requireUser(req, reply);
     if (!user) return;
     return buildProductivity(user.id);
+  });
+
+  // Personal momentum: XP/level, streaks, and badges for the signed-in user.
+  app.get('/me/momentum', async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const me = await prisma.user.findUnique({ where: { id: user.id }, select: { timezone: true } });
+    return buildMomentum(prisma, user.id, me?.timezone ?? null);
   });
 
   // Weekly progress + milestone + version rollups (self or admin).
