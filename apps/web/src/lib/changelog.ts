@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.2',
+    date: '2026-07-14',
+    title: 'Change status with a tap',
+    items: [
+      'Tap a task’s status pill on your board to change it — pick “done” to complete it, or set it back to “in progress”, “in review”, or “assigned”. Available on your own tasks.',
+    ],
+  },
+  {
     version: '2.2.1',
     date: '2026-07-14',
     title: 'Smoother, lighter loading',

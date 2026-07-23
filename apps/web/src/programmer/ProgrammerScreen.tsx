@@ -8,6 +8,7 @@ import type {
   QuestionDTO,
   SessionDTO,
   TaskDTO,
+  TaskStatus,
 } from '@cadence/shared';
 import { fmtDuration } from '../lib/format';
 import { useCountUp } from '../lib/useCountUp';
@@ -72,6 +73,7 @@ export interface ProgrammerScreenProps {
   /** viewer id + mark-done, for completing owned tasks */
   meId?: string;
   onMarkDone?: (taskId: string) => void | Promise<void>;
+  onSetStatus?: (taskId: string, status: TaskStatus) => void | Promise<void>;
   syncing?: boolean;
   /** open task sessions (id/title/startedAt) — a reliable top-of-board stop */
   runningTasks?: { id: string; title: string; startedAt: string }[];
@@ -336,6 +338,7 @@ export default function ProgrammerScreen({
   onRename = noop,
   meId,
   onMarkDone = noop,
+  onSetStatus,
   syncing = false,
   runningTasks = [],
   offTaskRunning = [],
@@ -519,6 +522,7 @@ export default function ProgrammerScreen({
                   onRefresh={onRefresh}
                   meId={meId}
                   onMarkDone={onMarkDone}
+                  onSetStatus={onSetStatus}
                   activityKeys={activityKeys}
                 />
               );

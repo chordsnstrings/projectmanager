@@ -10,6 +10,7 @@ import type {
   QuestionDTO,
   SessionDTO,
   TaskDTO,
+  TaskStatus,
   TeamDashboard,
   TeamDay as TeamDayDTO,
   Trends as TrendsDTO,
@@ -326,6 +327,16 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
       await api(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status: 'done' }) })
         .then(() => toast('Task marked complete', 'success'))
         .catch(() => toast('Couldn’t complete the task', 'error'));
+      await refresh();
+    },
+    [refresh],
+  );
+  // Change a task's status from the inline pill (assignee only).
+  const onSetStatus = useCallback(
+    async (taskId: string, status: TaskStatus) => {
+      await api(`/tasks/${taskId}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+        .then(() => toast(status === 'done' ? 'Task marked complete' : `Status → ${status.replace('_', ' ')}`, 'success'))
+        .catch(() => toast('Couldn’t update the status', 'error'));
       await refresh();
     },
     [refresh],
@@ -687,6 +698,7 @@ function DevApp({ me, route }: { me: Me; route: Route }) {
         onLoadMoreTasks={onLoadMoreTasks}
         meId={me.id}
         onMarkDone={onMarkDone}
+        onSetStatus={onSetStatus}
         meetings={myMeetings}
         onStartMeeting={onStartMeeting}
         onStart={onStart}

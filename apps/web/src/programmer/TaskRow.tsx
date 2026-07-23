@@ -53,6 +53,8 @@ export interface TaskRowProps {
   meId?: string;
   /** mark a task done (assignee only) */
   onMarkDone?: (taskId: string) => void | Promise<void>;
+  /** set any status from the inline pill menu (assignee only) */
+  onSetStatus?: (taskId: string, status: TaskStatus) => void | Promise<void>;
 }
 
 const noop = () => {};
@@ -93,11 +95,87 @@ const STATUS_DOT: Record<TaskStatus, string> = {
   done: '#5cc28d',
 };
 
-function StatusBadge({ status }: { status: TaskStatus }) {
-  return (
+const STATUS_ORDER: TaskStatus[] = ['todo', 'in_progress', 'in_review', 'done'];
+
+/**
+ * Task status pill. Read-only by default; when `onSelect` is provided (the
+ * viewer is the assignee) it becomes a button that opens a small menu to change
+ * status — e.g. tap "in progress" → pick "done" to complete it.
+ */
+function StatusBadge({
+  status,
+  onSelect,
+  busy = false,
+}: {
+  status: TaskStatus;
+  onSelect?: (next: TaskStatus) => void;
+  busy?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const pill = (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-[3px] text-[11px] font-medium ${STATUS_TONE[status]}`}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_DOT[status] }} aria-hidden />
-      {STATUS_LABEL[status]}
+      {busy ? 'saving…' : STATUS_LABEL[status]}
+    </span>
+  );
+
+  if (!onSelect) return pill;
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="change status"
+        className="inline-flex items-center gap-1 rounded-full transition-transform active:scale-[.96] disabled:opacity-60 hover:brightness-110"
+      >
+        {pill}
+        <span aria-hidden className="text-text3 text-[9px] -ml-0.5 pr-0.5">▾</span>
+      </button>
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="close status menu"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+            }}
+          />
+          <div
+            role="menu"
+            className="absolute left-0 top-full mt-1.5 z-50 min-w-[9.5rem] rounded-lg border border-hair2 bg-surface2 p-1 shadow-xl animate-scale-in"
+          >
+            {STATUS_ORDER.map((s) => (
+              <button
+                key={s}
+                type="button"
+                role="menuitemradio"
+                aria-checked={s === status}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  if (s !== status) onSelect(s);
+                }}
+                className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors hover:bg-white/[0.06] ${
+                  s === status ? 'text-text' : 'text-text2'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[s] }} aria-hidden />
+                <span className="flex-1">{STATUS_LABEL[s]}</span>
+                {s === status && <span className="text-brass text-[11px]" aria-hidden>✓</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </span>
   );
 }
@@ -133,6 +211,7 @@ export default function TaskRow({
   onRefresh = noop,
   meId,
   onMarkDone = noop,
+  onSetStatus,
   activityKeys,
 }: TaskRowProps) {
   const running = state === 'running';
@@ -144,6 +223,18 @@ export default function TaskRow({
   const [intentText, setIntentText] = useState('');
   const [busy, setBusy] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  // The assignee can change a task's status straight from the pill.
+  const canEditStatus = !!onSetStatus && !!meId && task.assigneeUserId === meId;
+  const changeStatus = async (next: TaskStatus) => {
+    if (!onSetStatus) return;
+    setStatusBusy(true);
+    try {
+      await onSetStatus(task.id, next);
+    } finally {
+      setStatusBusy(false);
+    }
+  };
   // Manual tasks (and anything with a brief/plan) carry a details panel:
   // description, the approved step-by-step, and a comment thread.
   const hasDetails = !!(task.description || task.plan) || task.source === 'manual';
@@ -197,7 +288,11 @@ export default function TaskRow({
                 <span className="font-mono text-text3">no git</span>
               </>
             ) : null}
-            <StatusBadge status={task.status} />
+            <StatusBadge
+              status={task.status}
+              onSelect={canEditStatus ? changeStatus : undefined}
+              busy={statusBusy}
+            />
             {task.estimateMinutes != null && (
               <span className="font-mono">est {fmtDuration(task.estimateMinutes)}</span>
             )}
