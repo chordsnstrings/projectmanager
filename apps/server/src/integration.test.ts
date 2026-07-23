@@ -244,6 +244,42 @@ describe('authed API integration', () => {
     await prisma.flag.delete({ where: { id: flag.id } });
   });
 
+  it('bulk flags: resolve-all, stop-all (skips meetings), ask-all; dev forbidden', async () => {
+    if (!available) return;
+    // a running study session + a running meeting, each with a live-timer flag
+    const study = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: devCookie }, payload: { offTaskLabel: 'study' } });
+    const meeting = await app.inject({ method: 'POST', url: '/sessions', headers: { cookie: adminCookie }, payload: { offTaskLabel: 'meeting' } });
+    const studyId = study.json().id, meetingId = meeting.json().id;
+    const f1 = await prisma.flag.create({ data: { type: 'open_no_activity', userId: devId, sessionId: studyId, detail: 'idle', status: 'open' } });
+    const f2 = await prisma.flag.create({ data: { type: 'open_no_activity', userId: adminId, sessionId: meetingId, detail: 'idle', status: 'open' } });
+
+    // members can't bulk-act
+    expect((await app.inject({ method: 'POST', url: '/flags/bulk', headers: { cookie: devCookie }, payload: { action: 'resolve' } })).statusCode).toBe(403);
+
+    // stop-all: the study session ends; the meeting is skipped (needs minutes)
+    const stop = await app.inject({ method: 'POST', url: '/flags/bulk', headers: { cookie: adminCookie }, payload: { action: 'stop' } });
+    expect(stop.statusCode).toBe(200);
+    expect(stop.json().stopped).toBeGreaterThanOrEqual(1);
+    expect(stop.json().skippedMeetings).toBeGreaterThanOrEqual(1);
+    expect((await prisma.session.findUniqueOrThrow({ where: { id: studyId } })).isOpen).toBe(false);
+    expect((await prisma.session.findUniqueOrThrow({ where: { id: meetingId } })).isOpen).toBe(true);
+
+    // ask-all: raises a question on every remaining open flag with an anchor
+    const ask = await app.inject({ method: 'POST', url: '/flags/bulk', headers: { cookie: adminCookie }, payload: { action: 'ask', body: 'status?' } });
+    expect(ask.statusCode).toBe(200);
+    expect(ask.json().asked).toBeGreaterThanOrEqual(1);
+    expect(await prisma.question.count({ where: { targetUserId: adminId, sessionId: meetingId } })).toBeGreaterThanOrEqual(1);
+
+    // resolve-all: nothing left open in scope
+    const resolve = await app.inject({ method: 'POST', url: '/flags/bulk', headers: { cookie: adminCookie }, payload: { action: 'resolve' } });
+    expect(resolve.statusCode).toBe(200);
+    expect(await prisma.flag.count({ where: { status: 'open', id: { in: [f1.id, f2.id] } } })).toBe(0);
+
+    await prisma.question.deleteMany({ where: { sessionId: { in: [studyId, meetingId] } } });
+    await prisma.flag.deleteMany({ where: { id: { in: [f1.id, f2.id] } } });
+    await prisma.session.deleteMany({ where: { id: { in: [studyId, meetingId] } } });
+  });
+
   it('does not resurrect a resolved flag on the next reconcile', async () => {
     if (!available) return;
     const { persistFlagCandidate } = await import('./engine/reconcileFlags');

@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.1',
+    date: '2026-07-14',
+    title: 'Clear all your flags at once',
+    items: [
+      'New bulk bar on the Flags tab: “Resolve all”, “Stop all sessions” (ends every running timer behind an idle / long-open flag — live meetings are skipped), and “Ask all” (send one question to everyone flagged).',
+    ],
+  },
+  {
     version: '2.0.6',
     date: '2026-07-14',
     title: 'Tidier headers on mobile',

@@ -12,6 +12,8 @@ export interface FlagsPanelProps {
   onAsk: (flag: FlagDTO, body: string) => void;
   /** Stop the running session a live-timer flag points at (idle / long-open). */
   onStopSession?: (flag: FlagDTO) => void;
+  /** Act on every open flag at once (resolve / stop sessions / ask the same question). */
+  onBulk?: (action: 'resolve' | 'stop' | 'ask', body?: string) => void | Promise<void>;
   onOpenUser?: (userId: string, iso?: string | null) => void;
 }
 
@@ -188,13 +190,94 @@ function FlagRow({
   );
 }
 
-export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onStopSession, onOpenUser, hasMore = false, onLoadMore }: FlagsPanelProps) {
+function BulkBar({ count, onBulk }: { count: number; onBulk: NonNullable<FlagsPanelProps['onBulk']> }) {
+  const [asking, setAsking] = useState(false);
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState<null | 'resolve' | 'stop' | 'ask'>(null);
+
+  const run = async (action: 'resolve' | 'stop' | 'ask', text?: string) => {
+    setBusy(action);
+    try {
+      await onBulk(action, text);
+      if (action === 'ask') {
+        setBody('');
+        setAsking(false);
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="px-4 sm:px-5 py-2.5 border-b border-hair bg-surface/30 flex flex-col gap-2 animate-fade-in">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-mono text-[11px] text-text3 mr-auto">act on all {count}</span>
+        <button
+          type="button"
+          disabled={busy != null}
+          onClick={() => run('resolve')}
+          className="btn btn-sm border-hair text-success hover:bg-surface active:scale-[.97] transition-transform disabled:opacity-50"
+        >
+          {busy === 'resolve' ? 'resolving…' : 'Resolve all'}
+        </button>
+        <button
+          type="button"
+          disabled={busy != null}
+          onClick={() => run('stop')}
+          className="btn btn-sm border-danger/40 bg-danger/10 text-danger hover:bg-danger/20 active:scale-[.97] transition-transform disabled:opacity-50"
+          title="end every running session behind an idle / long-open flag"
+        >
+          {busy === 'stop' ? 'stopping…' : 'Stop all sessions'}
+        </button>
+        <button
+          type="button"
+          disabled={busy != null}
+          onClick={() => setAsking((v) => !v)}
+          aria-expanded={asking}
+          className={`btn btn-sm border-hair text-brass hover:bg-surface active:scale-[.97] transition-transform disabled:opacity-50 ${asking ? 'bg-surface' : ''}`}
+        >
+          Ask all…
+        </button>
+      </div>
+      {asking && (
+        <div className="flex flex-col gap-2 sm:flex-row animate-fade-in">
+          <input
+            type="text"
+            value={body}
+            autoFocus
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && body.trim()) void run('ask', body.trim());
+              if (e.key === 'Escape') {
+                setAsking(false);
+                setBody('');
+              }
+            }}
+            placeholder="Ask everyone flagged the same question…"
+            className="field min-h-[32px] flex-1 px-3 font-mono text-sm transition-shadow focus:shadow-[0_0_0_3px_rgba(200,169,106,.15)]"
+          />
+          <button
+            type="button"
+            disabled={body.trim().length === 0 || busy != null}
+            onClick={() => void run('ask', body.trim())}
+            className="btn btn-sm border-brass/40 bg-brass/10 text-brass hover:bg-brass/20 active:scale-[.97] transition-transform disabled:opacity-40"
+          >
+            {busy === 'ask' ? 'sending…' : 'Send to all'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function FlagsPanel({ flags, onResolve, onDismiss, onAsk, onStopSession, onBulk, onOpenUser, hasMore = false, onLoadMore }: FlagsPanelProps) {
   return (
     <section className="card overflow-hidden animate-fade-in">
       <header className="px-4 sm:px-5 py-3.5 border-b border-hair flex items-center justify-between">
         <h2 className="text-sm font-semibold text-text tracking-tightish">Flags</h2>
         <span className="font-mono text-xs text-text3">{flags.length}</span>
       </header>
+      {onBulk && flags.length > 0 && <BulkBar count={flags.length} onBulk={onBulk} />}
 
       {flags.length === 0 ? (
         <div className="px-4 py-14 flex flex-col items-center justify-center gap-3 text-center">

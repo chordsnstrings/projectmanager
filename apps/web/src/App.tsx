@@ -998,6 +998,35 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
     },
     [loadFlags],
   );
+  // Bulk flag actions: act on every open flag in the manager's scope at once.
+  const onBulkFlags = useCallback(
+    async (action: 'resolve' | 'stop' | 'ask', body?: string) => {
+      if (action === 'ask' && !body?.trim()) return;
+      if (action === 'resolve') {
+        if (!(await confirmDialog({ title: 'Resolve all open flags?', body: 'Marks every flag in view as resolved. You can reopen them later.', confirmLabel: 'Resolve all' }))) return;
+      }
+      if (action === 'stop') {
+        if (!(await confirmDialog({ title: 'Stop all flagged sessions?', body: 'Ends every running session behind an idle or long-open flag. Live meetings are skipped (their minutes are required).', confirmLabel: 'Stop all', danger: true }))) return;
+      }
+      try {
+        const res = await api<{ resolved?: number; stopped?: number; skippedMeetings?: number; asked?: number }>('/flags/bulk', {
+          method: 'POST',
+          body: JSON.stringify({ action, body: body?.trim() }),
+        });
+        if (action === 'resolve') toast(`Resolved ${res.resolved ?? 0} flag${res.resolved === 1 ? '' : 's'}`, 'success');
+        if (action === 'stop') {
+          const skip = res.skippedMeetings ? ` · ${res.skippedMeetings} live meeting${res.skippedMeetings === 1 ? '' : 's'} skipped` : '';
+          toast(`Stopped ${res.stopped ?? 0} session${res.stopped === 1 ? '' : 's'}${skip}`, res.stopped ? 'success' : 'info');
+        }
+        if (action === 'ask') toast(`Asked ${res.asked ?? 0} ${res.asked === 1 ? 'person' : 'people'}`, 'success');
+      } catch {
+        toast('Couldn’t complete the bulk action', 'error');
+      }
+      void loadFlags();
+      void loadQuestions();
+    },
+    [loadFlags, loadQuestions],
+  );
   const onAsk = useCallback(
     (flag: FlagDTO, body: string) => {
       // A question needs a task OR a session to hang on (off-task flags have no task).
@@ -1132,7 +1161,7 @@ function AdminApp({ me, route }: { me: Me; route: Route }) {
 
       <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
         {tab === 'flags' ? (
-          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onStopSession={onStopSession} onOpenUser={openUserDay} hasMore={flagsCursor != null} onLoadMore={loadMoreFlags} />
+          <FlagsPanel flags={flags} onResolve={onResolve} onDismiss={onDismiss} onAsk={onAsk} onStopSession={onStopSession} onBulk={onBulkFlags} onOpenUser={openUserDay} hasMore={flagsCursor != null} onLoadMore={loadMoreFlags} />
         ) : tab === 'questions' ? (
           <QuestionsPanel questions={questions} onOpenUser={openUserDay} />
         ) : tab === 'pulse' ? (
