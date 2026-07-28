@@ -10,6 +10,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2.2.3',
+    date: '2026-07-14',
+    title: 'Fixed a frozen-scroll bug',
+    items: [
+      'Fixed a case where the page could stay unscrollable after closing the “what’s new” and check-in pop-ups together.',
+    ],
+  },
+  {
     version: '2.2.2',
     date: '2026-07-14',
     title: 'Change status with a tap',
