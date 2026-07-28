@@ -140,13 +140,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get('/me', async (req, reply) => {
     const userId = getSessionUserId(req);
     if (!userId) return reply.code(401).send({ error: 'not_authenticated' });
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
       include: { team: { select: { key: true } } },
     });
     if (!user) {
       clearSession(reply);
       return reply.code(401).send({ error: 'not_authenticated' });
+    }
+    // Self-heal bootstrap admins: someone listed in ADMIN_GITHUB_LOGINS who first
+    // signed in before being added to the list keeps a stale `dev` role until they
+    // re-login (promotion only runs during OAuth). Promote them here so it takes
+    // effect on the next app load — no sign-out/in required.
+    if (user.role !== 'admin' && env.ADMIN_GITHUB_LOGINS.includes(user.githubLogin.toLowerCase())) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { role: 'admin' },
+        include: { team: { select: { key: true } } },
+      });
+      req.log.info({ audit: 'user.bootstrap_admin_selfheal', userId: user.id, login: user.githubLogin }, 'audit');
     }
     return toMe(user);
   });

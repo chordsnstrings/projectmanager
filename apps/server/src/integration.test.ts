@@ -10,6 +10,8 @@ let adminId = '';
 let devId = '';
 let adminCookie = '';
 let devCookie = '';
+let bootstrapCookie = '';
+let bootstrapId = '';
 let available = true;
 
 const uniq = () => Math.floor(Math.random() * 2_000_000_000) + 1;
@@ -19,6 +21,8 @@ beforeAll(async () => {
     process.env.DATABASE_URL ?? 'postgresql://postgres@127.0.0.1:5433/cadence?schema=public';
   process.env.SESSION_SECRET = 'itest-secret';
   process.env.CADENCE_API_TOKEN = 'itest-api-token';
+  // Set BEFORE ./app (and its env module) is imported below so it's captured.
+  process.env.ADMIN_GITHUB_LOGINS = 'bootstrapadmin';
   try {
     const db = await import('@cadence/db');
     prisma = db.prisma;
@@ -34,10 +38,18 @@ beforeAll(async () => {
     });
     adminId = admin.id;
     devId = dev.id;
+    // A user listed in ADMIN_GITHUB_LOGINS but stored as `dev` (first signed in
+    // before being added to the list) — should self-heal to admin on GET /me.
+    const bootstrap = await prisma.user.create({
+      data: { githubId: BigInt(uniq()), githubLogin: 'bootstrapadmin', role: 'dev' },
+    });
+    bootstrapId = bootstrap.id;
     // @ts-expect-error decorated by @fastify/cookie
     adminCookie = `cad_session=${app.signCookie(adminId)}`;
     // @ts-expect-error decorated by @fastify/cookie
     devCookie = `cad_session=${app.signCookie(devId)}`;
+    // @ts-expect-error decorated by @fastify/cookie
+    bootstrapCookie = `cad_session=${app.signCookie(bootstrapId)}`;
   } catch {
     available = false;
   }
@@ -56,7 +68,7 @@ afterAll(async () => {
     await prisma.meetingMinutes.deleteMany({ where: { id: { in: mms.map((m: { id: string }) => m.id) } } });
   }
   await prisma.session.deleteMany({ where: { userId: { in: [adminId, devId] } } });
-  await prisma.user.deleteMany({ where: { id: { in: [adminId, devId] } } });
+  await prisma.user.deleteMany({ where: { id: { in: [adminId, devId, bootstrapId] } } });
   await app.close();
   await prisma.$disconnect();
 });
@@ -66,6 +78,17 @@ describe('authed API integration', () => {
     if (!available) return;
     const res = await app.inject({ method: 'GET', url: '/tasks' });
     expect(res.statusCode).toBe(401);
+  });
+
+  it('self-heals a bootstrap admin on GET /me (no re-login needed)', async () => {
+    if (!available) return;
+    // stored as dev, but listed in ADMIN_GITHUB_LOGINS
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: bootstrapId } })).role).toBe('dev');
+    const me = await app.inject({ method: 'GET', url: '/me', headers: { cookie: bootstrapCookie } });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().role).toBe('admin');
+    // persisted, so every later request sees admin
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: bootstrapId } })).role).toBe('admin');
   });
 
   it('runs two concurrent off-task sessions and lists them', async () => {
